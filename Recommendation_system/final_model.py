@@ -33,14 +33,14 @@ def run_model(filename,metrics,classifier,no_resampling_methods):
             21: 'SMOTETomek'
         }
         return switcher.get(i, "Invalid sampling method")
-    df = pd.read_csv("C:/Ronald/uOttawa/CSI 6900/Metallic-main/Metafeature/features.csv") #features_regression.csv
-    # filename="C:/Ronald/uOttawa/CSI 6900/Metallic-main/creating_metafeatures/test_dataset/hill-valley.csv" #input("enter the file name:")
+    df = pd.read_csv("C:/Ronald/uOttawa/CSI 6900/Metallic-main/Metafeature/features.csv") 
+
     filename=filename
 
     metrics=metrics
 
     classifier=classifier
-    # no_resampling_methods = int(input("How many top resampling methods do you want:"))
+   
     no_resampling_methods = no_resampling_methods
     rows=df[df[classifier]==1]
     y_train=np.array(rows[metrics]) #y_train

@@ -6,6 +6,8 @@ const ResamplingStrategyForm = () => {
   const [classifier, setClassifier] = useState('KNN');
   const [resampling, setResampling] = useState(0);
   const [recommendations, setRecommendations] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [inputKey, setInputKey] = useState(Date.now());
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -25,12 +27,19 @@ const ResamplingStrategyForm = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setIsProcessing(true);
     // You would handle the file upload and process it here
     // After processing, you would set the recommendations with the results
     const formData = new FormData();
+    // if (file) {
+    //   formData.append('file', file); // Use the File object directly
+    // }
     formData.append('file', file); // Assuming 'file' is the file to upload
+    formData.append('metric', metric);
+    formData.append('classifier', classifier);
+    formData.append('no_resampling_methods', resampling);
   
-    fetch('/upload', {
+    fetch('http://localhost:5000/runmodel', {
       method: 'POST',
       body: formData,
     })
@@ -38,15 +47,14 @@ const ResamplingStrategyForm = () => {
     .then(data => {
       console.log(data); // Logging the data for debugging
       setRecommendations(data.recommendations); // Update state with the recommendations from the backend
+      setIsProcessing(false);
+      setInputKey(Date.now());
     })
-    .catch(error => console.error('Error:', error));
-
-    // setRecommendations([
-    //   'BorderlineSMOTE',
-    //   'NeighbourhoodCleaningRule',
-    //   'CondensedNearestNeighbour',
-    // ]);
-  };
+    .catch(error => {console.error('Error:', error);
+    setIsProcessing(false);
+    setInputKey(Date.now());
+  });
+};
 
   return (
     <div className="form-container">
@@ -55,7 +63,7 @@ const ResamplingStrategyForm = () => {
         <p>Only .csv files are accepted</p>
         <label>
           Upload a File:
-          <input type="file" accept=".csv" onChange={handleFileChange} />
+          <input type="file" accept=".csv" onChange={handleFileChange} key={inputKey}/>
         </label>
         <br />
         <label>
@@ -98,11 +106,13 @@ const ResamplingStrategyForm = () => {
         </select>
         </label>
         <br />
-        <button type="submit">Process</button>
+        <button type="submit" disabled={isProcessing}>
+          {isProcessing ? 'Processing...' : 'Process'}
+        </button>
       </form>
       {recommendations.length > 0 && (
         <div className="form-item">
-          <h3>The recommended sampling methods are:</h3>
+          <h3>The recommended Resampling methods are:</h3>
           <ol>
             {recommendations.map((method, index) => (
               <li key={index}>{method}</li>
