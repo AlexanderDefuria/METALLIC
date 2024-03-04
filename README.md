@@ -6,6 +6,8 @@ Recommendation folder contains all the files required to run the recommendation 
 Validation folder contains files of validating of our model.
 
 # How to run the code
+# data_statistics.ipynb
+This notebook is used for summarizing all the dataset
 # Dataset
 It contains all the dataset.
 
