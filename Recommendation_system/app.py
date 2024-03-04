@@ -30,7 +30,7 @@ def run_model_route():
 
     filename = secure_filename(file.filename)
     print(filename)
-    filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/creating_metafeatures/test_dataset', filename)
+    filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/Recommendation_system/test_dataset', filename)
     
     # Save the file temporarily
     file.save(filepath)
@@ -38,12 +38,18 @@ def run_model_route():
     try:
         print("Processing...")
         recommendations = final_model.run_model(filepath, metric, classifier, no_resampling_methods)
-        print("Success")
+        # recommendations = final_model.run_model(filename, metric, classifier, no_resampling_methods)
+        print("Success!")
         print(recommendations)
     except Exception as e:
         # If there's an error during processing, log it and return an error response
         print(e)  # Log to console or a file as appropriate
         return jsonify({"error": "Failed to process the file"}), 500
+
+    finally:
+        # Ensure the file is removed after processing, even if there's an error
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
     print(jsonify({"recommendations": recommendations}))
     return jsonify({"recommendations": recommendations})

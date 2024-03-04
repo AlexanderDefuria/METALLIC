@@ -5,3 +5,32 @@ Creating_metafeatures folder contains all the files related to the creation of m
 Recommendation folder contains all the files required to run the recommendation system and to start recommendation system user need to give the name of file on which he needs to test, the select the metrics and base classifier.Use test2.py to start execution.
 Validation folder contains files of validating of our model.
 
+# How to run the code
+# Dataset
+It contains all the dataset.
+
+# creating meta feature
+If you add more "ariff" format data, store them to "additional_dataset" folder first, then head to the "processing_additional_data.ipynb" and use it to transform data into ".csv" file and store them to the "processed_dataset" folder. You may have to change their file name manually because sometime the name does not look nice. 
+
+If you want to add more models, metrics, or resampling strategies, wrap them in a ".py" file, and import them in the "main.py" to use.
+
+Run the "main.py" to get the meta-feature
+
+The "test_dataset" here is to test the recommendation system. Please **do not** use them in "creating_metafeatures" part and any training process.
+
+# validation
+Models are already built but notice that neural network models need scaling to get a better result. Otherwise, the MSE would be extremely unstable. "deep_validation.py" is not a good example because it does not have scaling process. Please use "deep_validation2.py" and "deep_validation3.py"
+
+There are four notebooks for comparing the result. You can use them to create comparison tables and specific plots.
+
+# exp_validation
+This folder contain the results of four meta-learning algorithms.
+
+# Recommendation System
+"final_model.py" is the model for backend recommendation system.
+
+"app.py" is the server that connect the back end with the front end.
+
+# my-resampling-strategy-app
+"ResamplingStrategyForm.js" is the code designed for the front end web page. "App.css" is the layout style. SYou can modifiy it based on what you need.
+
