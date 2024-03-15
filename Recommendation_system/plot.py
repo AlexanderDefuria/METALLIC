@@ -43,7 +43,7 @@ print("5.RF")
 classifier="RF"#input("enter the classifier:")
 rows=df[df[classifier]==1]
 y_train=np.array(rows[metrics]) #y_train
-x_train=rows.iloc[:,1:49] #Xtrain ready
+x_train=rows.iloc[:,1:46] #Xtrain ready
 X, y = data_handling.loading(filename)
 no_of_rows_original = X.shape[0]
 no_of_columns_original = X.shape[1]

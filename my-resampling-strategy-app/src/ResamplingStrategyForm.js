@@ -112,7 +112,7 @@ const ResamplingStrategyForm = () => {
       </form>
       {recommendations.length > 0 && (
         <div className="form-item">
-          <h3>The recommended Resampling methods are:</h3>
+          <h3>The recommended resampling methods are:</h3>
           <ol>
             {recommendations.map((method, index) => (
               <li key={index}>{method}</li>
