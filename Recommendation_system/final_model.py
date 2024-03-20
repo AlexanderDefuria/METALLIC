@@ -33,7 +33,8 @@ def run_model(filename,metrics,classifier,no_resampling_methods):
             21: 'SMOTETomek'
         }
         return switcher.get(i, "Invalid sampling method")
-    df = pd.read_csv("C:/Ronald/uOttawa/CSI 6900/Metallic-main/Metafeature/features.csv") 
+    # df = pd.read_csv("C:/Ronald/uOttawa/CSI 6900/Metallic-main/Metafeature/features.csv")
+    df = pd.read_csv("./Metafeature/features.csv")  
 
     filename=filename
 

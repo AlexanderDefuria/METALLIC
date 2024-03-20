@@ -8,6 +8,7 @@ from flask_cors import cross_origin
 
 
 app = Flask(__name__)
+# app.config.from_object(Config) keep a good habit
 CORS(app)
 @app.route('/runmodel', methods=['POST'])
 @cross_origin()
@@ -30,7 +31,8 @@ def run_model_route():
 
     filename = secure_filename(file.filename)
     print(filename)
-    filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/Recommendation_system/test_dataset', filename)
+    # filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/Recommendation_system/test_dataset', filename)
+    filepath = os.path.join('./Recommendation_system/test_dataset', filename)
     
     # Save the file temporarily
     file.save(filepath)
