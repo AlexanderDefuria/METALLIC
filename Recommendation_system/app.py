@@ -33,6 +33,7 @@ def run_model_route():
     print(filename)
     # filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/Recommendation_system/test_dataset', filename)
     filepath = os.path.join('./Recommendation_system/test_dataset', filename)
+    # filepath = os.path.join('./test_dataset', filename)
     
     # Save the file temporarily
     file.save(filepath)
