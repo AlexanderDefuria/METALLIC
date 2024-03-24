@@ -10,7 +10,7 @@ from flask_cors import cross_origin
 app = Flask(__name__)
 # app.config.from_object(Config) keep a good habit
 CORS(app)
-@app.route('/runmodel', methods=['POST'])
+@app.route('/runmodel', methods=['POST','GET'])
 @cross_origin()
 def run_model_route():
     # Check if the 'file' part is present in the request
