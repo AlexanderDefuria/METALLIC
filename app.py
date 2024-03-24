@@ -58,6 +58,9 @@ def run_model_route():
     return jsonify({"recommendations": recommendations})
     
 
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+# CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/api/*": {"origins": "https://meta-recommendation-system-gold.vercel.app"}})
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

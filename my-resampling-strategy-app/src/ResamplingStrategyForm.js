@@ -39,7 +39,8 @@ const ResamplingStrategyForm = () => {
     formData.append('classifier', classifier);
     formData.append('no_resampling_methods', resampling);
   
-    fetch('http://localhost:5000/runmodel', {
+    // fetch('http://localhost:5000/runmodel', {
+    fetch('https://metasystem-d5f6fe82f1f5.herokuapp.com/runmodel', {
       method: 'POST',
       body: formData,
     })
