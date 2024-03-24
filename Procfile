@@ -1,1 +1,1 @@
-web: python run_waitress.py
+web: python app.py
