@@ -14,16 +14,16 @@ form, h2, h3, p {
   padding: 0;
 }
 
-/* 为上传按钮和下拉菜单添加样式 */
+
 input[type="file"], select {
   padding: 5px;
   margin: 5px;
 }
 
-/* 调整推荐列表的样式 */
+
 ol {
-  text-align: left; /* 如果希望列表项左对齐 */
-  display: inline-block; /* 使列表居中显示 */
+  text-align: left; 
+  display: inline-block; 
 }
 
 .form-container {
@@ -34,19 +34,19 @@ ol {
 }
 
 .form-item {
-  width: fit-content; /* 子元素宽度根据内容自适应 */
-  text-align: left; /* 确保文本是左对齐的 */
+  width: fit-content; 
+  text-align: left; 
 }
 
 .form-content {
   display: flex;
   flex-direction: column;
-  align-items: flex-start; /* 子元素的左端对齐 */
+  align-items: flex-start; 
 }
 
-/* 如果你希望有一个最大宽度，可以设置一个具体的值 */
+
 .form-content {
-  max-width: 500px; /* 或者你想要的任何最大宽度 */
+  max-width: 500px; 
 }
 
 
@@ -83,4 +83,14 @@ ol {
   to {
     transform: rotate(360deg);
   }
+}
+
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.blinkingText {
+  animation: blink 1s infinite;
 }

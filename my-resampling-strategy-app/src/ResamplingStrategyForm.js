@@ -28,8 +28,6 @@ const ResamplingStrategyForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    // You would handle the file upload and process it here
-    // After processing, you would set the recommendations with the results
     const formData = new FormData();
     // if (file) {
     //   formData.append('file', file); // Use the File object directly
@@ -59,7 +57,7 @@ const ResamplingStrategyForm = () => {
 
   return (
     <div className="form-container">
-      <h2 className="form-item">Use your data to get the best resampling strategies</h2>
+      <h2 className="blinkingText">Use your data to get the best resampling strategies</h2>
       <form onSubmit={handleSubmit} className="form-item">
         <p>Only .csv files are accepted</p>
         <label>
