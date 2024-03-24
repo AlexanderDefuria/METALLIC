@@ -86,11 +86,12 @@ ol {
 }
 
 
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
-.blinkingText {
-  animation: blink 1s infinite;
+.bouncingText {
+  display: inline-block; 
+  animation: bounce 0.5s infinite;
 }
