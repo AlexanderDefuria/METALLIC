@@ -4,6 +4,7 @@ import os
 from flask_cors import CORS
 import pandas as pd
 import final_model2
+import final_model
 from flask_cors import cross_origin
 
 
@@ -42,8 +43,8 @@ def run_model_route():
     try:
         print("Processing...")
         # recommendations = final_model2.run_model(filepath, metric, classifier, no_resampling_methods)
-        recommendations = final_model2.run_model(filename, metric, classifier, no_resampling_methods)
-        # recommendations = final_model.run_model(filename, metric, classifier, no_resampling_methods)
+        # recommendations = final_model2.run_model(filename, metric, classifier, no_resampling_methods)
+        recommendations = final_model.run_model(filename, metric, classifier, no_resampling_methods)
         print("Success!")
         print(recommendations)
     except Exception as e:
