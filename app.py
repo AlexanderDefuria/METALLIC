@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 from flask_cors import CORS
 import pandas as pd
-import final_model
+import final_model2
 from flask_cors import cross_origin
 
 
@@ -41,7 +41,8 @@ def run_model_route():
     
     try:
         print("Processing...")
-        recommendations = final_model.run_model(filepath, metric, classifier, no_resampling_methods)
+        # recommendations = final_model2.run_model(filepath, metric, classifier, no_resampling_methods)
+        recommendations = final_model2.run_model(filename, metric, classifier, no_resampling_methods)
         # recommendations = final_model.run_model(filename, metric, classifier, no_resampling_methods)
         print("Success!")
         print(recommendations)
@@ -63,6 +64,6 @@ def run_model_route():
 # CORS(app, resources={r"/api/*": {"origins": "https://meta-recommendation-system-gold.vercel.app"}})
 CORS(app, resources={r"*": {"origins": "https://meta-recommendation-system-gold.vercel.app"}})
 if __name__ == '__main__':
-    # app.run(debug=True)
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
+    # port = int(os.environ.get('PORT', 5000))
+    # app.run(host='0.0.0.0', port=port)

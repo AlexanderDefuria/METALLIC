@@ -116,7 +116,6 @@ def run_model(filename,metrics,classifier,no_resampling_methods):
         RepeatedEditedNearestNeighbours_value = 0
         AllKNN_value = 0
         CondensedNearestNeighbour_value = 0
-        OneSidedSelection_value = 0
         NeighbourhoodCleaningRule_value = 0
         InstanceHardnessThreshold_value = 0
         SMOTETomek_value = 0
