@@ -37,8 +37,8 @@ const ResamplingStrategyForm = () => {
     formData.append('classifier', classifier);
     formData.append('no_resampling_methods', resampling);
   
-    fetch('http://localhost:5000/runmodel', {
-    // fetch('https://metallic-recommendation-system-d699fe44117d.herokuapp.com/runmodel', {
+    // fetch('http://localhost:5000/runmodel', {
+    fetch('https://metallic-recommendation-system-d699fe44117d.herokuapp.com/runmodel', {
       method: 'POST',
       body: formData,
     })
