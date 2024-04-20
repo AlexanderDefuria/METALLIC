@@ -79,9 +79,7 @@ const ResamplingStrategyForm = () => {
         <ul style={{ textAlign: 'left', listStylePosition: 'inside', paddingLeft: '20px' }}>
           <li>The dataset should be in a csv format</li>
           <li>The last column should contain the target variable</li>
-          <li>Your categorical features should be encoded as numeric variables</li>
           <li>The classification task can be both multiclass and binary classification</li>
-          <li>The target variable should be encoded as a numeric variable</li>
           {/* Add other requirements here */}
         </ul>
       </div>
