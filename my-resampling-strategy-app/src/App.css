@@ -38,6 +38,11 @@ ol {
   text-align: left; 
 }
 
+.form-introduction {
+  width: fit-content; 
+  text-align: left; 
+}
+
 .form-content {
   display: flex;
   flex-direction: column;

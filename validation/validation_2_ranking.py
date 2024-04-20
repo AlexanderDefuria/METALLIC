@@ -66,6 +66,14 @@ for j in ['KNN','DT','GNB','SVM','RF','GB','ADA','CAT']:
             y_train = np.array(selected_dataframe[metric])
             # x_train = selected_dataframe.iloc[:, 1:49]
             x_train = selected_dataframe.iloc[:, 1:50]
+            # colsample_bytree: [0.4,0.8]
+            # learning_rate: [0.02,0.07]
+            # max_depth: [3,6]
+            # min_child_weight: [1.5,2]
+            # n_estimators: [10000,20000]
+            # reg_alpha: [10000,20000]
+            # reg_lambda: [0.45,1]
+            # subsample: [0.6,1]
             model = xg.XGBRegressor(objective ='reg:squarederror',colsample_bytree=0.4, gamma=0, learning_rate=0.07, max_depth=3,
                                                 min_child_weight=1.5,n_estimators=10000, reg_alpha=0.75, reg_lambda=0.45, subsample=0.6, seed=42)
             x_train = np.array(x_train)

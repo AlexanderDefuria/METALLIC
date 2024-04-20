@@ -10,6 +10,7 @@ import math
 from keras.models import Sequential
 from keras.layers import Dense,Dropout, BatchNormalization
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 # p = "/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/exp_validation/deep_scores/kappa_score.csv"
 # p1="/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/exp_validation/deep_scores/krippendorf.csv"
 # p2="/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/exp_validation/deep_scores/precission.csv"
@@ -50,7 +51,8 @@ kapa_score=[]
 krippen_score=[]
 precision_5=[]
 total_metric=[]
-scaler = MinMaxScaler()
+# scaler = MinMaxScaler()
+scaler = StandardScaler()
 for j in ['KNN','DT','GNB','SVM','RF','GB','ADA','CAT']:
     for i in names:
         print(i)
@@ -95,9 +97,10 @@ for j in ['KNN','DT','GNB','SVM','RF','GB','ADA','CAT']:
             # compile the keras model
             model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['MeanSquaredError'])
             # fit the keras model on the dataset
-            x_train=np.array(x_train)
-            y_train[np.isnan(y_train)] = 0
-            model.fit(np.array(x_train),y_train, epochs = 5, verbose = 0)
+            # x_train=np.array(x_train)
+            # y_train[np.isnan(y_train)] = 0
+            # model.fit(np.array(x_train),y_train, epochs = 5, verbose = 0)
+            model.fit(x_train,y_train, epochs = 5, verbose = 0)
 
             y_pred = list(model.predict(np.array(x_test)))
             y_preds=[]

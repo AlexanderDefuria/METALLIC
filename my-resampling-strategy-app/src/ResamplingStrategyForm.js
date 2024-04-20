@@ -37,8 +37,8 @@ const ResamplingStrategyForm = () => {
     formData.append('classifier', classifier);
     formData.append('no_resampling_methods', resampling);
   
-    // fetch('http://localhost:5000/runmodel', {
-    fetch('https://metallic-recommendation-system-d699fe44117d.herokuapp.com/runmodel', {
+    fetch('http://localhost:5000/runmodel', {
+    // fetch('https://metallic-recommendation-system-d699fe44117d.herokuapp.com/runmodel', {
       method: 'POST',
       body: formData,
     })
@@ -57,7 +57,36 @@ const ResamplingStrategyForm = () => {
 
   return (
     <div className="form-container">
-      <h2 className="form-item">Use your data to get the best resampling strategies</h2>
+      <h2 className="form-item">METALLIC: META-Learning for Class Imbalance</h2>
+      <h2 className="form-item">Upload your data to get the best resampling strategies!</h2>
+      <p className="spacing">&nbsp;</p>
+      <div className="text-container" style={{ textAlign: 'left', maxWidth: '600px' }}>
+        <p className="description" >
+        This app is based on the paper "METALLIC: Meta-Learning for Class Imbalance".
+        </p>
+        <p className="spacing">&nbsp;</p>
+        <p className="description" >
+        We proposed METALLIC, an algorithm that helps the end-user to automatically find the best resampling techniques to apply in a given dataset, when considering a selected performance metric and classifier. 
+        </p>
+        <p className="spacing">&nbsp;</p>
+        <p className="description" >
+        This web application provides the recommendation system we proposed that allows any interested researcher to upload a dataset and obtain the recommendation of the top performing resampling strategies for the task at hand.
+        </p>
+        <p className="spacing">&nbsp;</p>
+        <p className="description" >
+        Before uploading a dataset check the dataset requirements:
+        </p>
+        <ul style={{ textAlign: 'left', listStylePosition: 'inside', paddingLeft: '20px' }}>
+          <li>The dataset should be in a csv format</li>
+          <li>The last column should contain the target variable</li>
+          <li>Your categorical features should be encoded as numeric variables</li>
+          <li>The classification task can be both multiclass and binary classification</li>
+          <li>The target variable should be encoded as a numeric variable</li>
+          {/* Add other requirements here */}
+        </ul>
+      </div>
+      
+
       <form onSubmit={handleSubmit} className="form-item">
         <p>Only .csv files are accepted</p>
         <label>

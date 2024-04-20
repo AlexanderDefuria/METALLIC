@@ -2,6 +2,7 @@ import xgboost as xg
 import numpy as np
 import pandas as pd
 import data_handling
+import data_preprocessing
 import distance
 import hypersphere
 import overlapping,kmeans
@@ -46,7 +47,8 @@ def run_model(filename,metrics,classifier,no_resampling_methods):
     rows=df[df[classifier]==1]
     y_train=np.array(rows[metrics]) #y_train
     x_train=rows.iloc[:,1:46] #Xtrain ready
-    X, y = data_handling.loading(filename)
+    X, y = data_preprocessing.process_data(filename)
+    # X, y = data_handling.loading(filename)
     no_of_rows_original = X.shape[0]
     no_of_columns_original = X.shape[1]
     no_of_class=len(np.unique(y))

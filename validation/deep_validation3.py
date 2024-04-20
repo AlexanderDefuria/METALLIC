@@ -10,6 +10,7 @@ import math
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, BatchNormalization
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from keras.callbacks import EarlyStopping
 # p = "/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/exp_validation/deep_scores/kappa_score.csv"
 # p1="/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/exp_validation/deep_scores/krippendorf.csv"
@@ -51,7 +52,8 @@ kapa_score=[]
 krippen_score=[]
 precision_5=[]
 total_metric=[]
-scaler = MinMaxScaler()
+# scaler = MinMaxScaler()
+scaler = StandardScaler()
 for j in ['KNN','DT','GNB','SVM','RF','GB','ADA','CAT']:
     for i in names:
         print(i)
@@ -96,10 +98,11 @@ for j in ['KNN','DT','GNB','SVM','RF','GB','ADA','CAT']:
 
             # early_stopping = EarlyStopping(monitor='mean_squared_error', patience=5)
             # fit the keras model on the dataset
-            x_train=np.array(x_train)
-            y_train[np.isnan(y_train)] = 0
+            # x_train=np.array(x_train)
+            # y_train[np.isnan(y_train)] = 0
             # model.fit(np.array(x_train),y_train, epochs = 5, callbacks=[early_stopping], verbose = 2)
-            model.fit(np.array(x_train),y_train, epochs = 5, verbose = 2)
+            # model.fit(np.array(x_train),y_train, epochs = 5, verbose = 2)
+            model.fit(x_train,y_train, epochs = 5, verbose = 0)
 
             y_pred = list(model.predict(np.array(x_test)))
             y_preds=[]
