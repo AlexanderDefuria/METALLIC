@@ -62,7 +62,8 @@ const ResamplingStrategyForm = () => {
   });
 };
   const checkForResult = (task_id) => {
-    fetch(`http://localhost:5000/results/${task_id}`)
+    // fetch(`http://localhost:5000/results/${task_id}`)
+    fetch(`https://metallic-recommendation-system-d699fe44117d.herokuapp.com/${task_id}`)
       .then(response => response.json())
       .then(data => {
         console.log(data)
