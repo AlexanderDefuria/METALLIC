@@ -2,16 +2,39 @@ from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 from flask_cors import CORS
-import pandas as pd
 import final_model2
 import final_model
 from flask_cors import cross_origin
-import numpy as np
+import queue
+import threading
+import uuid
+import time
 
 
 app = Flask(__name__)
 # app.config.from_object(Config) keep a good habit
 CORS(app)
+
+task_queue = queue.Queue()
+results = {}
+def daemon():
+    while True:
+        task = task_queue.get(block=True)
+        try:
+            # time.sleep(10)
+            task_id = task['id']
+            recommendations = final_model.run_model(**task['args'])
+            results[task_id] = recommendations
+            print(f"Task completed with result: {recommendations}")
+        finally:
+            task_queue.task_done()
+            filepath = task['args']['filename']
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                print(f"Deleted file at {filepath}")
+
+threading.Thread(target=daemon, daemon=True).start()
+
 @app.route('/runmodel', methods=['POST','GET'])
 @cross_origin()
 def run_model_route():
@@ -33,37 +56,36 @@ def run_model_route():
 
     filename = secure_filename(file.filename)
     print(filename)
-    # filepath = os.path.join('C:/Ronald/uOttawa/CSI 6900/Metallic-main/Recommendation_system/test_dataset', filename)
-    # filepath = os.path.join('./Recommendation_system/test_dataset', filename)
     filepath = os.path.join('./', filename)
-    # filepath = os.path.join('./test_dataset', filename)
     
     # Save the file temporarily
     file.save(filepath)
-    
-    try:
-        print("Processing...")
-        # recommendations = final_model2.run_model(filepath, metric, classifier, no_resampling_methods)
-        # recommendations = final_model2.run_model(filename, metric, classifier, no_resampling_methods)
-        recommendations = final_model.run_model(filename, metric, classifier, no_resampling_methods)
-        print("Success!")
-        print(recommendations)
-    except Exception as e:
-        # If there's an error during processing, log it and return an error response
-        print(e)  # Log to console or a file as appropriate
-        return jsonify({"error": "Failed to process the file"}), 500
 
-    finally:
-        # Ensure the file is removed after processing, even if there's an error
-        if os.path.exists(filepath):
-            os.remove(filepath)
+    task_id = str(uuid.uuid4())
 
-    print(jsonify({"recommendations": recommendations}))
-    return jsonify({"recommendations": recommendations})
+    task = {
+        'id': task_id,
+        'args': {
+            'filename': filepath,
+            'metric': metric,
+            'classifier': classifier,
+            'no_resampling_methods': no_resampling_methods
+        },
+        'filepath': filepath  
+    }
+    task_queue.put(task)
+    return jsonify({"task_id": task_id}), 202  
+
+@app.route('/results/<task_id>', methods=['GET'])
+def get_results(task_id):
+    if task_id in results:
+        # return jsonify({"recommendations": results.pop(task_id)})  # Use pop to clear completed results
+        return jsonify({"recommendations": results[task_id]})  
+    else:
+        return jsonify({"status": "Task is still processing"}), 202
     
 
 # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
-# CORS(app, resources={r"/api/*": {"origins": "https://meta-recommendation-system-gold.vercel.app"}})
 CORS(app, resources={r"*": {"origins": "https://meta-recommendation-system-gold.vercel.app"}})
 if __name__ == '__main__':
     # app.run(debug=True)

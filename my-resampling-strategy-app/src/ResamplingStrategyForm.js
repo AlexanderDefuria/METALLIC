@@ -44,16 +44,47 @@ const ResamplingStrategyForm = () => {
     })
     .then(response => response.json())
     .then(data => {
-      console.log(data); // Logging the data for debugging
-      setRecommendations(data.recommendations); // Update state with the recommendations from the backend
-      setIsProcessing(false);
-      setInputKey(Date.now());
+      if(data.task_id){
+        console.log('Task ID received:', data.task_id);
+        checkForResult(data.task_id)
+      }else{
+        throw new Error('Task ID not received from the backend')
+      }
+      // console.log(data); // Logging the data for debugging
+      // setRecommendations(data.recommendations); // Update state with the recommendations from the backend
+      // setIsProcessing(false);
+      // setInputKey(Date.now());
     })
     .catch(error => {console.error('Error:', error);
     setIsProcessing(false);
     setInputKey(Date.now());
+    alert('Failed to submit the task.');
   });
 };
+  const checkForResult = (task_id) => {
+    fetch(`http://localhost:5000/results/${task_id}`)
+      .then(response => response.json())
+      .then(data => {
+        console.log(data)
+        if (data.recommendations) {
+          setRecommendations(data.recommendations);
+          setIsProcessing(false);
+        } else if (data.status === "Task is still processing") {
+          console.log('Task is still processing, will check again soon');
+          setTimeout(() => checkForResult(task_id), 5000); // Check again after 5 seconds
+        } else {
+          console.error('Error retrieving results');
+          setIsProcessing(false);
+          alert('Failed to retrieve results.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        setIsProcessing(false);
+        alert('Failed to retrieve results.');
+      });
+  };
+
 
   return (
     <div className="form-container">
@@ -86,6 +117,7 @@ const ResamplingStrategyForm = () => {
       
 
       <form onSubmit={handleSubmit} className="form-item">
+      {/* <form onSubmit={checkForResult} className="form-item"> */}
         <p>Only .csv files are accepted</p>
         <label>
           Upload a File:

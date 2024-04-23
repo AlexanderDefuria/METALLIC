@@ -7,7 +7,7 @@ import distance
 import hypersphere
 import overlapping,kmeans
 from scipy.stats import rankdata
-def run_model(filename,metrics,classifier,no_resampling_methods):
+def run_model(filename,metric,classifier,no_resampling_methods):
 
     def sample(i):
         switcher = {
@@ -39,13 +39,13 @@ def run_model(filename,metrics,classifier,no_resampling_methods):
     # df = pd.read_csv("./features.csv")  
     filename=filename
 
-    metrics=metrics
+    metric=metric
 
     classifier=classifier
    
     no_resampling_methods = no_resampling_methods
     rows=df[df[classifier]==1]
-    y_train=np.array(rows[metrics]) #y_train
+    y_train=np.array(rows[metric]) #y_train
     x_train=rows.iloc[:,1:46] #Xtrain ready
     X, y = data_preprocessing.process_data(filename)
     # X, y = data_handling.loading(filename)
