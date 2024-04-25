@@ -1,13 +1,12 @@
 import xgboost as xg
 import numpy as np
 import pandas as pd
+import data_handling
 import data_preprocessing
 import distance
 import hypersphere
 import overlapping,kmeans
 from scipy.stats import rankdata
-from sklearn.neighbors import KNeighborsRegressor
-
 def run_model(filename,metric,classifier,no_resampling_methods):
 
     def sample(i):
@@ -49,6 +48,7 @@ def run_model(filename,metric,classifier,no_resampling_methods):
     y_train=np.array(rows[metric]) #y_train
     x_train=rows.iloc[:,1:46] #Xtrain ready
     X, y = data_preprocessing.process_data(filename)
+    # X, y = data_handling.loading(filename)
     no_of_rows_original = X.shape[0]
     no_of_columns_original = X.shape[1]
     no_of_class=len(np.unique(y))
@@ -227,10 +227,7 @@ def run_model(filename,metric,classifier,no_resampling_methods):
         test_row.extend((None_value,SMOTE_value,NearMiss_value,SMOTEENN_value,Randomoversampling_value,ADASYN_value,BorderlineSMOTE_value,SVMSMOTE_value,RandomUnderSampler_value,ClusterCentroids_value,NearMissversion1_value,NearMissversion2_value,NearMissversion3_value,TomekLinks_value,EditedNearestNeighbours_value,RepeatedEditedNearestNeighbours_value,AllKNN_value,CondensedNearestNeighbour_value,NeighbourhoodCleaningRule_value,InstanceHardnessThreshold_value,SMOTETomek_value))
         test_x.append(test_row)
         test_row=test_row[:24]
-    if metric == "BalancedAccuracy" or metric == "CWA":
-        model = KNeighborsRegressor(k=5)
-    else:
-        model = xg.XGBRegressor(colsample_bytree=0.4,gamma=0,learning_rate=0.07,max_depth=3,min_child_weight=1.5,n_estimators=10000,reg_alpha=0.75,reg_lambda=0.45,subsample=0.6,seed=42)
+    model = xg.XGBRegressor(colsample_bytree=0.4,gamma=0,learning_rate=0.07,max_depth=3,min_child_weight=1.5,n_estimators=10000,reg_alpha=0.75,reg_lambda=0.45,subsample=0.6,seed=42,n_jobs=1)
     x_train=np.array(x_train)
     model.fit(np.array(x_train),y_train)
     y_pred=model.predict(np.array(test_x))
