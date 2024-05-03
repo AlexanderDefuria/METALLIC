@@ -26,6 +26,10 @@ Models are already built but notice that neural network models need scaling to g
 
 There are four notebooks for comparing the result. You can use them to create comparison tables and specific plots.
 
+For "comparison_score_for_*" files, I just copied the data from the tables from "comparison-2" file, which is convenient and then plot the result.
+
+The comparison_plot_all is based on all the datasets and we take F1 score for example.
+
 # exp_validation
 This folder contain the results of four meta-learning algorithms.
 
