@@ -8,7 +8,7 @@ Validation folder contains files of validating of our model.
 # How to run the code
 
 # Dataset
-It contains all the dataset.
+It contains all the 155 datasets.
 
 # creating meta feature
 If you add more "ariff" format data, store them to "additional_dataset" folder first, then head to the "processing_additional_data.ipynb" and use it to transform data into ".csv" file and store them to the "processed_dataset" folder. You may have to change their file name manually because sometime the name does not look nice. 
