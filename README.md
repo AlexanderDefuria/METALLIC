@@ -6,8 +6,6 @@ Recommendation folder contains all the files required to run the recommendation 
 Validation folder contains files of validating of our model.
 
 # How to run the code
-# data_statistics.ipynb
-This notebook is used for summarizing all the dataset
 
 # Dataset
 It contains all the dataset.
@@ -20,6 +18,8 @@ If you want to add more models, metrics, or resampling strategies, wrap them in 
 Run the "main.py" to get the meta-feature
 
 The "test_dataset" here is to test the recommendation system. Please **do not** use them in "creating_metafeatures" part and any training process.
+
+"data_statistics.ipynb" is used for summarizing all the dataset
 
 # validation
 Models are already built but notice that neural network models need scaling to get a better result. Otherwise, the MSE would be extremely unstable. "deep_validation.py" is not a good example because it does not have scaling process. Please use "deep_validation2.py" and "deep_validation3.py"
