@@ -44,5 +44,5 @@ This folder contain the results of four meta-learning algorithms.
 "test_dataset" folder here is just for temporarily saving.
 
 # my-resampling-strategy-app
-"ResamplingStrategyForm.js" is the code designed for the front end web page. "App.css" is the layout style. SYou can modifiy it based on what you need.
+"ResamplingStrategyForm.js" is the code designed for the front end web page. "App.css" is the layout style. So you can modifiy it based on what you need.
 
