@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
+
+# This is only used in final_model.py at the root level
 def process_data(filename):
     df = pd.read_csv(filename)
 

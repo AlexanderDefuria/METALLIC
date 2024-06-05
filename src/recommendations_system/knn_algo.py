@@ -1,14 +1,38 @@
+import sys
 import xgboost as xg
 import numpy as np
 import pandas as pd
-import data_preprocessing
-import distance
+import data_handling
+import src.distance as distance
 import hypersphere
 import overlapping,kmeans
 from scipy.stats import rankdata
-from sklearn.neighbors import KNeighborsRegressor
+from math import sqrt
+# sys.path.insert(1, "/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/creating_metafeatures")
+sys.path.insert(1, "C:/Ronald/uOttawa/CSI 6900/Metallic-main/creating_metafeatures")
+import missing_values
+def knn_pred_ranking(algo, metric, dataset_name, full_data):
 
-def run_model(filename,metric,classifier,no_resampling_methods):
+    def euclidean_distance(row1, row2):
+        distance = 0.0
+        for i in range(len(row1)-1):
+            distance += (row1[i] - row2[i])**2
+        return sqrt(distance)
+
+    def get_neighbors(train, test_row, num_neighbors):
+        distances = list()
+        c =0 
+        metric_list = []
+        for train_row in train:
+            dist = euclidean_distance(test_row, train_row)
+            distances.append((train_row, dist, c))
+            c = c+1
+        distances.sort(key=lambda tup: tup[1])
+        neighbors = list()
+        for i in range(num_neighbors):
+            neighbors.append(distances[i][0])
+            metric_list.append(distances[i][2])
+        return neighbors,metric_list
 
     def sample(i):
         switcher = {
@@ -35,20 +59,22 @@ def run_model(filename,metric,classifier,no_resampling_methods):
             21: 'SMOTETomek'
         }
         return switcher.get(i, "Invalid sampling method")
-    # df = pd.read_csv("C:/Ronald/uOttawa/CSI 6900/Metallic-main/Metafeature/features.csv")
-    df = pd.read_csv("./Metafeature/features.csv")  
-    # df = pd.read_csv("./features.csv")  
-    filename=filename
-
-    metric=metric
-
-    classifier=classifier
-   
-    no_resampling_methods = no_resampling_methods
+    df = full_data #features_regression.csv
+    # filename="/Volumes/Education-Imp/UOttawa Master's/Final_Project/METALLIC/Dataset/"+dataset_name #input("enter the file name:")
+    filename="C:/Ronald/uOttawa/CSI 6900/Metallic-main/Dataset/"+dataset_name+".csv" #input("enter the file name:")
+    metrics=metric #input("enter the metrics to be considered:")
+    # print("select the Classifiers:")
+    # print("1.KNN")
+    # print("2.DT")
+    # print("3.GNB")
+    # print("4.SVM")
+    # print("5.RF")
+    classifier=algo#input("enter the classifier:")
     rows=df[df[classifier]==1]
-    y_train=np.array(rows[metric]) #y_train
-    x_train=rows.iloc[:,1:46] #Xtrain ready
-    X, y = data_preprocessing.process_data(filename)
+    y_train=np.array(rows[metrics]) #y_train
+    x_train=rows.iloc[:,1:49] #Xtrain ready
+    X, y = data_handling.loading(filename)
+    X= missing_values.handle_missing_values(X,y,1)
     no_of_rows_original = X.shape[0]
     no_of_columns_original = X.shape[1]
     no_of_class=len(np.unique(y))
@@ -59,7 +85,7 @@ def run_model(filename,metric,classifier,no_resampling_methods):
         state = 'binaryclass'
         state_value = 0
     # unsupervised_kmeans
-    Silhouettescore, DaviesBouldinscore, Calinskiharabazscore, Cohesionscore, Separationscore, RMSSTDscore, RSscore, XBscore, Adjustedrandomscore, Adjusted_mutual_info_score, Fowlkes_mallows_score, Normalizedmutualinfoscore = kmeans.k_Means(X, y)
+    Silhouettescore, DaviesBouldinscore, Calinskiharabazscore, Cohesionscore, Separationscore, RMSSTDscore, RSscore, XBscore, Adjustedrandomscore, Adjusted_mutual_info_score, Fowlkes_mallows_score, Normalizedmutualinfoscore = kmeans.kmeans_metadata(X, y)
     # imbalanced ratio
     y = y.astype(int)
     classes_data = list(np.unique(y))
@@ -93,7 +119,6 @@ def run_model(filename,metric,classifier,no_resampling_methods):
 
     # volume of overlap
     over=overlapping.volume_overlap(X,y)
-
     test_x=[]
     test_row=[no_of_rows_original,no_of_columns_original,state_value,Silhouettescore,DaviesBouldinscore,Calinskiharabazscore,Cohesionscore,Separationscore,RMSSTDscore,RSscore,XBscore,Adjustedrandomscore,Adjusted_mutual_info_score,Fowlkes_mallows_score,Normalizedmutualinfoscore,imbalanced_ratio_before_sampling,total_hypersphere,hypersphere_minority,hypersphere_majority,samplesperhypersphere,samplesperhypersphere_minority,samplesperhypersphere_majority,distance_between_classes,over]
     for i in ['None', 'SMOTE', 'NearMiss', 'SMOTEENN', 'Randomoversampling', 'ADASYN', 'BorderlineSMOTE', 'SVMSMOTE',
@@ -118,6 +143,7 @@ def run_model(filename,metric,classifier,no_resampling_methods):
         RepeatedEditedNearestNeighbours_value = 0
         AllKNN_value = 0
         CondensedNearestNeighbour_value = 0
+        OneSidedSelection_value = 0
         NeighbourhoodCleaningRule_value = 0
         InstanceHardnessThreshold_value = 0
         SMOTETomek_value = 0
@@ -226,40 +252,82 @@ def run_model(filename,metric,classifier,no_resampling_methods):
 
         test_row.extend((None_value,SMOTE_value,NearMiss_value,SMOTEENN_value,Randomoversampling_value,ADASYN_value,BorderlineSMOTE_value,SVMSMOTE_value,RandomUnderSampler_value,ClusterCentroids_value,NearMissversion1_value,NearMissversion2_value,NearMissversion3_value,TomekLinks_value,EditedNearestNeighbours_value,RepeatedEditedNearestNeighbours_value,AllKNN_value,CondensedNearestNeighbour_value,NeighbourhoodCleaningRule_value,InstanceHardnessThreshold_value,SMOTETomek_value))
         test_x.append(test_row)
-        test_row=test_row[:24]
-    if metric == "BalancedAccuracy" or metric == "CWA":
-        model = KNeighborsRegressor(n_neighbors=5, n_jobs=1)
-    else:
-        model = xg.XGBRegressor(colsample_bytree=0.4,gamma=0,learning_rate=0.07,max_depth=3,min_child_weight=1.5,n_estimators=10000,reg_alpha=0.75,reg_lambda=0.45,subsample=0.6,seed=42,n_jobs=1)
-    x_train=np.array(x_train)
-    model.fit(np.array(x_train),y_train)
-    y_pred=model.predict(np.array(test_x))
-    #ranking=rankdata(y_pred,)
-    y_pred=pd.DataFrame(y_pred)
-    #print('y_pred:',y_pred)
-    ranking=y_pred.rank(ascending=False)
-    ranking=np.array(ranking)
-    list_rank=[]
-    for i in ranking:
-        for j in i:
-            list_rank.append(float(j))
-    sort_ranking=list_rank.copy()
-    sort_ranking.sort()
-    # top_3=sort_ranking[:3]
-    top_n=sort_ranking[:no_resampling_methods]
+        test_row=test_row[:27]
+
+    x_train.drop_duplicates(subset='Original Rows',inplace=True)
+    req_train = x_train.iloc[:, 0:27]
+    req_train = req_train.values.tolist()
+    # print(req_train.head(5))
+    neighbors, metric = get_neighbors(req_train, test_row, 4)
+    neighbors = neighbors[1:]
+    metric = metric[1:]
+    # print(neighbors)
+    # print(metric)
+    df_num = 0
+    df_dict = {}
+    for i in neighbors:
+        df_num = df_num + 1
+        A = i[4]
+        B = i[3]
+        C = i[9]
+        D = i[10]
+        E = i[13]
+        df_dict[df_num] = df.loc[(df['DaviesBouldinscore'] == A) & (df['Silhouettescore'] == B) & (df['RSscore'] ==C) & (df['XBscore'] == D) & (df['Fowlkes_mallows_score'] == E)]
+    for name, df in df_dict.items():
+        df1 = df_dict.get(1)
+        df2 = df_dict.get(2)
+        df3 = df_dict.get(3)
+    imb_strategies = ['None', 'SMOTE', 'NearMiss', 'SMOTEENN', 'Randomoversampling', 'BorderlineSMOTE', 'SVMSMOTE',
+            'RandomUnderSampler', 'ClusterCentroids', 'NearMissversion1', 'NearMissversion2', 'NearMissversion3',
+            'TomekLinks', 'EditedNearestNeighbours', 'RepeatedEditedNearestNeighbours', 'AllKNN',
+            'CondensedNearestNeighbour', 'NeighbourhoodCleaningRule', 'InstanceHardnessThreshold', 'SMOTETomek']
+    value_list1 = []
+    value_list2 = []
+    value_list3 = []
+    for i in imb_strategies:
+        new_df1 = df1.loc[df1[i] == 1]
+        new_df1 = new_df1.loc[new_df1[classifier] == 1, metrics]
+        try:
+            val = new_df1.iloc[0]
+        except:
+            val = 0
+        value_list1.append(val)
+
+        new_df2 = df2.loc[df2[i] == 1]
+        new_df2 = new_df2.loc[new_df2[classifier] == 1, metrics]
+        try:
+            val2 = new_df2.iloc[0]
+        except:
+            val2 = 0
+        value_list2.append(val2)
+
+        new_df3 = df3.loc[df3[i] == 1]
+        new_df3 = new_df3.loc[new_df3[classifier] == 1, metrics]
+        try:
+            val3 = new_df3.iloc[0]
+        except:
+            val3 = 0
+        value_list3.append(val3)
+        # print(new_df1)
+    new_val_list = []
+    for i in range(len(value_list1)):
+        tot_val = value_list1[i] + value_list2[i] + value_list3[i]
+        new_val_list.append(tot_val)
+
+
+    req = sorted(zip(new_val_list, imb_strategies), reverse=True)
+    # print(req)
     index_list=[]
-    # for i in top_3:
-    for i in top_n:
-        index_list.append(list_rank.index(i))
-    #print(index_list)
-    
-    recommendation_list = []
+    for val, imb in req:
+        index_list.append(imb)
+    return index_list
+    # print(index_list)
+    # first=index_list[0]
+    # second=index_list[1]
+    # third=index_list[2]
     # print("The recommended sampling methods are:")
-    for i in range(len(index_list)):
-        # print(str(i+1) + "." + sample(index_list[i]+1))
-        recommendation_list.append(sample(index_list[i]+1))
-    return recommendation_list
+    # print("1.",first)
+    # print("2.",second)
+    # print("3.",third)
 
 
-if __name__ == '__main__':
-    

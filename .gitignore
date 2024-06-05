@@ -1,6 +1,3 @@
-my-resampling-strategy-app/node_modules/
-Dataset-backup/
-Dataset1/
-Dataset2/
-code-backup/
-catboost_info
+venv
+/venv
+
