@@ -1,5 +1,5 @@
 from sklearn.ensemble import AdaBoostClassifier
-import evaluation
+import src.legacy.evaluation as evaluation
 import time
 
 def ADA_classifier(X_train, y_train, X_test, y_test, state):

@@ -1,3 +1,5 @@
 venv
 /venv
+/data/processed_datasets_old/**
+/catboost_info
 

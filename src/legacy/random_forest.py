@@ -1,11 +1,11 @@
-import sklearn
-import evaluation
 import time
+import src.legacy.evaluation as evaluation
+import sklearn
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 import numpy as np 
 import pandas as pd 
-from sklearn.tree import DecisionTreeClassifier 
+from sklearn.ensemble import RandomForestClassifier 
 from sklearn import metrics
 from sklearn.model_selection import cross_val_score
 from hyperopt import fmin, tpe, hp, STATUS_OK,Trials
@@ -14,18 +14,18 @@ from sklearn import datasets
 import warnings
 warnings.filterwarnings("ignore")
 
-def decision_tree(X_train, y_train,X_test,y_test,state):
-    # spl = ["best","random"]
+def rf_classifier(X_train, y_train, X_test, y_test, state):
+    # est = [100, 200, 300, 400,500]
     # cri = ["gini", "entropy"]
 
     # space = {
-    #     "splitter": hp.choice("splitter", spl),
+    #     "n_estimators": hp.choice("n_estimators", est),
     #     "max_depth": hp.quniform("max_depth", 1, 7,1),
     #     "criterion": hp.choice("criterion", cri),
     # }
 
     # def hyperparameter_tuning(params):
-    #     clf = DecisionTreeClassifier(**params)
+    #     clf = RandomForestClassifier(**params,n_jobs=-1)
     #     acc = cross_val_score(clf, X_train, y_train,scoring="f1_macro").mean()
     #     return {"loss": -acc, "status": STATUS_OK}
 
@@ -42,23 +42,23 @@ def decision_tree(X_train, y_train,X_test,y_test,state):
     # # print("Best: {}".format(best))
     # x = cri[best.get("criterion")]
     # y = best.get("max_depth")
-    # z = spl[best.get("splitter")]
+    # z = est[best.get("n_estimators")]
     # print(x,y,z)
-
     a = time.time()
-    dt = sklearn.tree.DecisionTreeClassifier().fit(X_train, y_train)
+    rf = sklearn.ensemble.RandomForestClassifier().fit(X_train, y_train)
     b = time.time()
     train_time = (b - a)
     c = time.time()
-    y_pred = dt.predict(X_test)
+    y_pred = rf.predict(X_test)
     d = time.time()
     predict_time = (d - c)
 
-    lr_probs = dt.predict_proba(X_test)
+    lr_probs = rf.predict_proba(X_test)
     # lr_probs = lr_probs[:, 1]
     if lr_probs.shape[1] == 1:
         lr_probs = np.hstack([1 - lr_probs, lr_probs])
     else:
         lr_probs = lr_probs[:, 1]
+    return evaluation.evaluation(y_pred, y_test, state,lr_probs,X_test)
 
-    return evaluation.evaluation(y_pred, y_test, state, lr_probs, X_test)
+

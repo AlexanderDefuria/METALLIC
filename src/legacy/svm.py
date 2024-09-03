@@ -1,5 +1,5 @@
 import time
-import evaluation
+import src.legacy.evaluation as evaluation
 import sklearn
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score

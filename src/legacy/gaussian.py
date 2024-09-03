@@ -1,6 +1,6 @@
 from sklearn.naive_bayes import GaussianNB
 import numpy as np
-import evaluation
+import src.legacy.evaluation as evaluation
 import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score

@@ -1,4 +1,3 @@
-from threading import RLock
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -25,6 +24,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import compute_class_weight
+from src.data_preprocessing import preprocess
+from scipy.io import arff
 from xgboost import XGBClassifier
 from imblearn.combine import SMOTEENN, SMOTETomek
 from imblearn.over_sampling import SMOTE, ADASYN, BorderlineSMOTE, SVMSMOTE, RandomOverSampler 
@@ -46,18 +47,49 @@ from distance import distance
 from kmeans import KMeansMetadata
 from hypersphere import create_hypersphere
 from overlapping import volume_overlap
-from complexity_metric import complexity
-from weighted_complexity import weighted_complexity
-from tomeklink_complexity import tomelink_complexity
-from dual_weighted_complexity import dualweighted_complexity
+from complexity import complexity, weighted_complexity, dualweighted_complexity, tomelink_complexity
 
 
 def dataset_dir() -> Path:
-    return Path(__file__).parent.parent / "datasets"
+    return Path(__file__).parent.parent / "data"
 
 
-def collect_datasets() -> List[Path]:
-    return list(dataset_dir().glob("*.csv"))
+def arrf_datasets_dir() -> Path:
+    return Path(__file__).parent.parent / "data" / "arrf_datasets"
+
+def processed_datasets_dir() -> Path:
+    return Path(__file__).parent.parent / "data" / "processed_datasets"
+
+def raw_datasets_dir() -> Path:
+    return Path(__file__).parent.parent / "data" / "raw_datasets"
+
+
+def collect_datasets(directory: Path) -> List[Path]:
+    if not directory.exists() or not directory.is_dir():
+        return []
+    
+    return list(directory.glob("*.csv"))
+
+
+def collect_arrf_datasets() -> List[Path]:
+    '''
+    Collects ARFF datasets and converts them to CSV format if they have not been converted before.
+    Returns:
+        List[Path]: A list of paths to the converted CSV datasets.
+    '''
+    
+    existing_csv_datasets = collect_datasets(raw_datasets_dir())
+    arrf_datasets = list(arrf_datasets_dir().glob("*.arff"))
+    arrf_to_process =  [dataset for dataset in arrf_datasets if dataset.with_suffix(".csv") not in existing_csv_datasets]
+    converted_paths = []
+    for dataset in arrf_to_process:
+        data, _ = arff.loadarff(dataset)
+        df = pd.DataFrame(data)
+        path = dataset_dir / dataset.with_suffix(".csv")
+        df.to_csv(path, index=False)
+        converted_paths.append(path)
+        
+    return converted_paths
 
 
 def calculate_complexity_metadata(data: pd.DataFrame) -> Dict[str, float]:
@@ -121,6 +153,7 @@ def calculate_hypershpere_metadata(X: pd.DataFrame, y: pd.Series):
         "hypershpere_count_majority": clusters_per_class[majority_class_index],
     }
 
+
 def get_imbalance_ratio(y: pd.Series) -> float:
     return y.value_counts().min() / y.value_counts().max()
 
@@ -139,6 +172,12 @@ def get_classifiers() -> Dict[str, object]:
 
 
 def get_resamplers() -> Dict[str, object]:
+    """
+    Returns a dictionary of resamplers.
+    Returns:
+        Dict[str, object]: A dictionary where the keys are the names of the resamplers and the values are the corresponding resampler objects.
+    """
+    
     return {
         "none": None,
         "smote": SMOTE(),
@@ -225,7 +264,16 @@ def train_classifiers(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.Data
     }
 
 
-def calculate_metafeatures(file: Path, lock: RLock) -> pd.DataFrame:
+def calculate_metafeatures(file: Path) -> pd.DataFrame:
+    """
+    Calculate metafeatures for a given dataset file.
+    Args:
+        file (Path): The path to the dataset file.
+    Returns:
+        pd.DataFrame: A DataFrame containing the calculated metafeatures.
+    Raises:
+        Exception: If an error occurs during the calculation.
+    """
 
     file_name = file.stem
     dataset = pd.read_csv(file)
@@ -278,31 +326,40 @@ def calculate_metafeatures(file: Path, lock: RLock) -> pd.DataFrame:
     results['dataset'] = file_name
     results = results.reindex(columns=reversed(results.columns))
     
-    with lock: 
-        try: 
-            metafeatures = pd.read_csv("features_new.csv")
-            metafeatures = pd.concat([metafeatures, results], ignore_index=True)
-        except pd.errors.EmptyDataError:
-            metafeatures = results
-        except Exception as e:
-            print(e)
-            print(results)
-            print(metafeatures)
-            raise e
-        
-        metafeatures.to_csv("features_new.csv", index=False)
-    
-    return file_name
+    return results
 
 
 if __name__ == "__main__":
-    os.remove("features_new.csv") 
-    os.system("touch features_new.csv") 
-
-    lock = RLock()
+    metafeature_file = Path("metafeatures.csv")
+    os.remove(metafeature_file) 
+    os.system(f"touch {metafeature_file.absolute()}")
     
+    # Convert ARFF datasets to CSV format
+    collect_arrf_datasets()
+        
+    # Clean the CSV datasets and preprocess them
+    datasets = collect_datasets(raw_datasets_dir())
+    for dataset in datasets:
+        df, target = preprocess(dataset)
+        df.save_csv(processed_datasets_dir() / dataset.name)
+
+    # Calculate metafeatures and classifiers for each dataset
     with ThreadPoolExecutor(max_workers=10) as executor:
-        datasets = sorted(collect_datasets())
-        executor.map(calculate_metafeatures, datasets, [lock] * len(datasets))
+        datasets = sorted(collect_datasets(processed_datasets_dir()))
+        for result in executor.map(calculate_metafeatures, datasets):
+            print(result)
+            try:
+                metafeatures = pd.read_csv(metafeature_file)
+                metafeatures = pd.concat([metafeatures, result], ignore_index=True)
+            except pd.errors.EmptyDataError:
+                metafeatures = result
+            except Exception as e:
+                print(e)
+                print(result)
+                print(metafeatures)
+                raise e
+            
+            metafeatures.to_csv(metafeature_file, index=False)
+
     
     print("Done!")

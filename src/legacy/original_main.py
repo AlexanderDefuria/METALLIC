@@ -10,20 +10,20 @@ import numpy as np
 import pandas as pd
 import glob, kmeans
 import hypersphere
-import knn
-import decision_tree
-import gaussian
-import svm as SVM
-import random_forest
+import src.legacy.knn as knn
+import src.legacy.decision_tree as decision_tree
+import src.legacy.gaussian as gaussian
+import src.legacy.svm as SVM
+import src.legacy.random_forest as random_forest
 import adaboost
 import cat
-import xgb
+import src.legacy.xgb as xgb
 from imblearn.over_sampling import *
 from imblearn.under_sampling import *
 from imblearn.combine import *
 import os
 from os import path
-import data_handling
+import src.legacy.data_handling as data_handling
 from sklearn.model_selection import StratifiedKFold
 import missing_values
 import complexity_metric

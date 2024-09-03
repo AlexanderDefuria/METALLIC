@@ -1,5 +1,5 @@
 from xgboost import XGBClassifier
-import evaluation
+import src.legacy.evaluation as evaluation
 import time
 from sklearn.metrics import roc_auc_score
 
