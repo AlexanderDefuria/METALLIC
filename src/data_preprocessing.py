@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+import math
+from math import sqrt
 
 
 def preprocess(filename):
