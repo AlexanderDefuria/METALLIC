@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from sklearn import metrics
 from sklearn.cluster import KMeans
 from sklearn.metrics import davies_bouldin_score
@@ -41,7 +40,7 @@ def divide(data, labels):
     clusters_data = []
     for cluster in clusters:
         clusters_data.append(data[labels == cluster])
-    
+
     return clusters_data
 
 
@@ -142,7 +141,7 @@ def XB(data, clusters, centroids):
 def get_validation_scores(data, labels):
 
     data = np.array(data)
-    
+
     within_cluster_dist_sum_store.clear()
 
     clusters = divide(data, labels)

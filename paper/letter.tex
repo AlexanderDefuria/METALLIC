@@ -1,0 +1,50 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2cm]{geometry}
+\usepackage{authblk}
+
+\newtheorem{hyp}{Hypothesis} 
+
+\title{METALLIC: Meta-Learning for Class Imbalance}
+
+\author[1]{Rani Adhaduk\thanks{radha067@uottawa.ca}}
+\author[1]{Sai Ukkalam\thanks{sukka088@uottawa.ca}}
+\author[2]{Mayukh Bhattacharjee\thanks{mayukhofficial12@gmail.com}}
+\author[1]{Jean-Gabriel Gaudreault\thanks{j.gaudreault@uottawa.ca}}
+\author[1]{Paula Branco\thanks{pbranco@uottawa.ca}}
+\affil[1]{School of Electrical Engineering and Computer Science\\
+              University of Ottawa, Canada}
+\affil[2]{University of Engineering and Management\\
+              Kolkata, India}
+
+\renewcommand\Authands{ and }
+
+\date{June 2022}
+
+\begin{document}
+
+\maketitle
+
+\section{Claim}
+In imbalance classification scenarios, it is quite common that the least represented class, which represents rare events, is the class of most relevance for the user. However, the scarcity of these samples compared to ones from other class(es) often cause machine learning models to perform poorly when classifying these samples due to their poor representation in the data. A simple and common strategy to improve the model's performance on these scarce samples is the use of resampling techniques in order to increase the ratio of the underrepresented class(es) within the dataset. Like most machine learning techniques, there exist different proposed applications of these resampling algorithms, which can perform vastly differently depending on the problem's context, and leaves the tedious task of testing the efficiency of each algorithm to the end-user. 
+
+In this work, we aim to address this issue by proposing a meta-learning-based algorithm, METALLIC, which uses meta-features of the data in order to evaluate how common resampling strategies will perform on a given dataset, classifier, and performance metric. We demonstrate that our proposed algorithm is accurate at predicting the score of applying a certain resampling strategy without the need to compute it and is therefore efficient at providing end-users with effective resampling strategies for a given problem.
+
+\section{Evidence}
+We explored and provided 3 variants for our proposed meta-learner using common machine learning models, namely nearest neighbors, regression, and neural network. These variants were trained on meta-features extracted from a total of 107 imbalanced datasets displaying varying characteristics, and their performance was compared. We noted that the regression approach was the most accurate since it displayed the highest Kappa, Krippendorff, and precision@5 scores across all testing scenarios, which means that this variant was the most accurate at providing projected rankings for the best resampling strategies, in alignment with the true rankings. Using this variant, we provided a concrete example of an application of METALLIC on an imbalanced dataset, where we tested our recommendation algorithm with a specific classifier, random forest, and evaluated the difference between the predicted and actual values of multiple performance metrics, namely F1 score, G-Mean, precision, accuracy, ROC AUC, balanced accuracy, and mean class-weighted accuracy. Our results showed that for every metric, our proposed algorithm was able to predict the scores very accurately, which demonstrates its ability to give good recommendations on the best resampling strategies to use for a given problem.
+
+\section{Related Work}
+While limited, there have been some publications in the context of using meta-learning or automated systems for resampling method recommendation. We denote the work of Moniz and Cerqueira~\cite{moniz2021automated}, where they proposed ATOMIC, an automated machine learning approach that aims to optimize workflows for imbalanced classification problems. Our proposal differs from this work in several ways, as we do not use our algorithm for workflow evaluation but rather directly on the specific task of recommending the most effective strategy for a particular problem (combination of dataset, learning algorithm and performance metric of interest). Furthermore, our proposal considers a significantly more exhaustive list of resampling techniques (19 vs. 6), base learners (5 vs. 1), target performance metrics (9 vs. 1). Moreover, we consider a larger number of meta-features, that cover specific characteristics of the data which can influence the performance of the classifiers, such as task complexity, class overlap, and small disjuncts. We must also note the work of Sahni et al.~\cite{sahni2021aided} which also tries to establish a relationship between different resampling techniques and meta-features extracted from the data. However, similarly to the aforementioned publication, our work presents significant disparities, as we study a much more comprehensive and larger set of complex meta-features, algorithms, resampling techniques, and performance metrics. Ultimately, our study presents much more complex meta-features related to important data characteristics in imbalanced scenarios and implements a larger number of resampling techniques, base learners, and performance metrics than other work, which allows for very tailored and accurate recommendations of resampling techniques on any type of data. Finally, another key distinguishing aspect concerns the web application that we provide freely to the research community and any interested end-user that allows to use our proposed solution to obtain a set of recommended resampling techniques. As far as we know this is the first tool of this kind available.
+
+\section{Previous Submissions and Reviewer Suggestion}
+Neither this work nor part of it was published in any other publications.
+
+%The authors would like to suggest the following reviewers for this paper:
+%\begin{itemize}
+%    \item 
+%\end{itemize}
+  
+\bibliographystyle{abbrv}
+\bibliography{refs}
+
+\end{document}

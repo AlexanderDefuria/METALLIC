@@ -2,9 +2,11 @@ import warnings
 
 import numpy as np
 from sklearn import metrics
+
 warnings.filterwarnings("ignore")
 
-def create_hypersphere(X,y) -> np.ndarray:
+
+def create_hypersphere(X, y) -> np.ndarray:
     pool = list(range(X.shape[0]))
     size = X.shape
     np.random.shuffle(pool)

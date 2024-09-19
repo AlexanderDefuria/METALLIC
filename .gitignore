@@ -1,5 +1,15 @@
 venv
 /venv
 /data/processed_datasets_old/**
+/data/processed_datasets/**
 /catboost_info
+/paper/**
+!paper/figures/**
+!paper/tables/**
+!paper/diagrams/**
+!paper/manuscript.tex
+!paper/letter.tex
+!paper/refs.bib
+!paper/old_refs.bib
+__pycache__/**
 

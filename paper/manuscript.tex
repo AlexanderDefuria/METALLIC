@@ -1,0 +1,998 @@
+%\documentclass{svjour3}                     % onecolumn (standard format)
+%\documentclass[smallcondensed]{svjour3}     % onecolumn (ditto)
+%\documentclass[smallextended]{svjour3}       % onecolumn (second format)
+%\documentclass[twocolumn]{svjour3}          % twocolumn
+\documentclass{article} 
+
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{units}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{placeins} % forcing the floats to stay before the references
+\usepackage{float}
+\usepackage{rotating}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{caption}
+\usepackage{rotating}
+\usepackage{tikz}
+\usepackage[disable]{todonotes}
+
+% Alexander Packages
+\usepackage[skip=8pt plus1pt, indent=20pt]{parskip}
+\usepackage{macros} % Alexander, comes from symbolic link I use for all my work. 
+\usepackage[
+    backend=biber,
+    style=numeric,
+    sorting=none,
+]{biblatex}
+
+\DeclareSourcemap{\maps[datatype=bibtex]{\map{\step[typesource=letter, typetarget=misc]}}}
+
+\addbibresource{refs.bib}
+
+%\newcommand{\Relev}{\ensuremath{\phi}}
+%\newcommand{\dY}{\ensuremath{\mathcal{Y}}}
+%\newcommand{\SM}{\textsc{Smote}}
+
+\graphicspath{{Figures/}}
+
+
+\author{Alexander De Furia \and Rani Adhaduk \and Sai Ukkalam \and Jean Gaudreault \and Paula Branco \thanks{Corresponding author: P. Branco (pbranco@uottawa.ca)}}
+\title{METALLIC:\@ Meta-Learning for Class Imbalance}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Imbalanced data is an important challenge in multiple concrete applications of machine learning, which raises many issues. One of of these problems is that the trained models will typically prioritize the most frequently occurring classes and therefore will perform poorly in detecting the more scarce cases. A common strategy to address this issue is to artificially resample the data by applying oversampling or undersampling to the corresponding classes of the dataset, a strategy for which numerous techniques have been proposed. However, as the efficacy of the resampling methods is highly dependent on the characteristics of the application problem, there is no single resampling technique that works best in the majority of the scenarios. This leads the end-user or researcher to the tedious and time consuming task of testing multiple resampling techniques with the classifiers selected for the predictive task to understand which provide more advantages. To address this issue, we propose METALLIC, a solution that helps the end-user to automatically find the best resampling techniques to apply in a given dataset, when considering a selected performance metric and classifier. We devise a high number of relevant meta-features that are extracted from the data and are used by our model to determine the top performing resampling methods to be use. We show that our proposed model is efficient at recommending resampling strategies for a given problem. We also implemented a recommendation system available through a web application that allows any interested researcher to upload a dataset and obtain the recommendation of the top performing resampling strategies for the task at hands. Finally, our built dataet is also freely available to the research community.
+\end{abstract}
+
+
+\section{Introduction}
+% List some real world applications of imbalanced learning TODO: Should we just cite a survey here?
+% What is imbalanced problem?
+%
+Numerous real-world applications of machine learning tasks such as malicious web domain identification~\cite{huMaliciousWebDomain2019}, protein function classification~\cite{zhaoAptamerModifiedMonolithicCapillary2008}, voice activity detection~\cite{leeDualAttentionTime2020}, fraud detection~\cite{makkiImbalancedFraud2019}, and many more involve dealing with the class imbalance problem. In these scenarios, a target class, usually of interest to the end-user, are under represented compared to datapoints belonging to the majority. The skewed distribution of the classes posses an important challenge as it renders state-of-the-art Machine Learning (ML) algorithms less effective at predicting the rare cases occurring in the dataset~\cite{brancoSurveyPredictiveModeling2016}. Indeed, many classifiers can display a performance bias towards the most frequent cases (majority or negative class), while performing poorly on the least frequent ones (minority or positive class)~\cite{kaurSystematicReviewImbalanced2019}. One of the most simple and common ways to alleviate the class imbalance problem and increase the significance of the minority class is to resample the classes in order to provide to the learning algorithm a dataset with a balanced distribution~\cite{heImbalancedLearning2009}. 
+
+These resampling strategies are usually clustered within three categories: (i) oversampling, i.e., the addition of samples to the minority class; (ii) undersampling, which refers to the deletion of samples from the majority class; and (iii) hybrid strategies, which involve a concurrent use of the two aforementioned strategies. For all of these categories, several techniques with varying degrees of complexity have been proposed in the literature, which we will review in Section~\autoref{sec:related_work}. Considering that, as indicated by Burnaev et al.~\cite{burnaevInfluenceResamplingAccuracy2015}, there is no ubiquitous choice of resampling technique, as each technique can have varying degrees of success depending on the context of the problem, choosing a suitable technique for a given problem can be a tedious task. The traditional approach for choosing a resampling strategy involves either a trial and error process or using expert knowledge of the domain, which also has several disadvantages~\cite{wangImprovedMethodsClassification2015}. To address this problem, we propose METALLIC (META-Learning for cLass ImbalanCe), a recommendation system based on Meta-Learning that aims to provide the best set of resampling techniques to apply for a given dataset, classifier, and target performance metric, as selected by the end-user. This system is built upon the concept of Meta-Learning (MtL), the ``learning to learn"~\cite{schmidhuberEvolutionaryPrinciplesSelfreferential1987} paradigm, wherein meta-features are calculated by training a large number of imbalanced datasets with different properties and a machine learning model is then trained on these meta-features with the goal of predicting which sampling technique will perform the best given a dataset, classifier, and performance metric. The goal of METALLIC is twofold: i) assist end-users in selecting the best solution for the problem domain without assuming that they have the expertise and time to carry out all necessary experiments; and ii) take advantage of the repetitive use of machine learning on similar tasks~\cite{brazdilMetalearningApplicationsData2008}.
+
+Although a huge amount of research has been dedicated to the development of new and improved resampling methods to tackle the class imbalance problem, the development of meta-learning systems or automatic methods to address this task is still very limited. To the best of our knowledge, the only related proposal to our work, that also tries to find similarities between the resampling and binary classification tasks through a set of meta-features was proposed by Sahni et al.~\cite{sahniAidedSelectionSampling2021}. Our proposal differs from this work in several ways, as we study a larger and more comprehensive set of meta-features covering both binary and multiclass imbalanced problems. Moreover, we study the use of five different algorithms to derive a recommendation system of resampling techniques to be applied for a given task, given a selected classifier and performance metric. Another related work also proposes the use of the concept of meta-learning to address the class imbalance problem~\cite{monizAutomatedImbalancedClassification2021}. However, in this solution, the extracted meta-features and the resampling techniques tested are different from the ones we selected. In effect, our study is more extensive in terms of new task complexity measures and other hypersphere-based measures that are extracted, and involves a much larger number of resampling techniques options which boosts the end-user options providing a recommendation of over twenty resampling possibilities instead of six. Our main contributions can be summarized as follows:
+
+% - propose METALLIC method,   
+% - extensive experimental comparison
+% - new dataset available
+% - new web application for the end-user
+% - code available
+
+\begin{enumerate}[label=(\roman*)]
+\item Propose METALLIC, a novel meta-learning-based algorithm that uses a vast and diverse amount of meta-features, to accurately predict the best resampling strategies for a given dataset, classifier, and target performance metric; 
+\item Conduct an extensive experimental comparison to assess the performance of our solution;
+% set of experiments extraction of an ensemble of complex meta-features used as a basis for our recommendation system; 
+\item Provide a new comprehensive dataset suitable for the study of meta-learning systems that incorporates the results of 107 imbalanced datasets with varying degrees of imbalance and different characteristics, and has a high diverse set of meta-features and the performance of 9 metrics on 5 learners;
+\item Provide a web application based on our METALLIC Algorithm,
+freely available to the research community and end-users, that allows to easily obtain resampling strategy recommendations for a given dataset, classifier, and performance metric; and
+\item Provide all the code used in our experiments for reproducibility purposes.
+\end{enumerate}
+
+The rest of this paper is structured as follows. Section \autoref{sec:related_work} presents a summary of related work and some background information. Section \autoref{sec:METALLIC} gives a brief overview of our proposed METALLIC Algorithm. Section \autoref{sec:methodology} presents the methodology used. In Section \autoref{sec:results} we show the experiments undertaken, provide the results obtained, and describe the web application developed. Finally, Section \autoref{sec:conclusion} gives our concluding remarks and potential future work.
+
+\section{Related Work}\label{sec:related_work}
+In this section we present an overview of the relevant work in the two main fields that we bring together in this paper: meta-learning and resampling techniques.
+
+\subsection{Resampling Techniques}
+Resampling techniques are well-known solutions for dealing with imbalanced domain problems, as an unbalanced distribution of the target variables can lead to poor performance with machine learning models~\cite{kaurSystematicReviewImbalanced2019}. The use of these methods has been thoroughly studied for dealing with the class imbalance problem~\cite{brancoSurveyPredictiveModeling2016} in binary classification, as well as other predictive tasks such as regression~\cite{brancoPreprocessingApproachesImbalanced2019}, and multi-label classification~\cite{zhangClassImbalanceAwareMultiLabel2022}. These methods involve changing the data distribution of the dataset by either oversampling the minority instances, undersampling the majority instances, or a combination of both (hybrid sampling). In this work, we have selected
+a vast number of commonly used resampling techniques, as we will describe further in the coming sections.
+
+\subsubsection{Oversampling}
+Oversampling techniques can usually be clustered into one of two main approaches: adding replicas of already existing examples, or the addition of new, synthetically generated examples. An example of the former approach is one of the most simple, yet effective oversampling methods, referred to as random oversampling~\cite{kubatAddressingCurseImbalanced2000}. In this strategy, minority class examples are randomly selected and duplicated in the training set. This process is typically applied until both classes reach a balanced distribution. 
+
+Regarding the latter approach, which involves the generation of synthetic samples, several techniques have been proposed in the literature. A common example is Synthetic Minority Oversampling TEchnique (SMOTE)~\cite{chawlaSMOTESyntheticMinority2002} which is an oversampling technique that allows the generation of synthetic examples through an interpolation method. For a given seed case of the minority class, one of its $k$ nearest minority class neighbors is randomly selected. Then, a new example is randomly obtained along the line that joins the two cases. Several other alternatives have been proposed based on the SMOTE algorithm while trying to overcome some of its flaws~\cite{saezSMOTEIPFAddressing2015}. Han et al.~\cite{hanBorderlineSMOTENewSampling2005} introduced a novel approach called Borderline-SMOTE in which the minority instances from the borderline areas are oversampled. Adaptive Synthetic sampling approach for Imbalanced Learning (ADASYN)~\cite{haiboheADASYNAdaptiveSynthetic2008} is an altered version of the SMOTE algorithm which improves it in two different ways: (i) by lessening the bias caused due to the class distribution; and (ii) by shifting the decision boundary in an adaptive way towards the more difficult samples in the classification setting. SVM-SMOTE~\cite{nguyenBorderlineSamplingImbalanced2011} is a version of the Borderline-SMOTE algorithm that uses Support Vector Machine (SVM) to approximate the class border region once SVM classifiers have been trained on the training dataset. The synthetic instances are then generated at random along the boundary line that connects every minority class support vector and the number of nearest neighbors.
+
+\subsubsection{Undersampling}
+The most common and simple undersampling technique is random undersampling~\cite{kubatAddressingCurseImbalanced2000}, a method that balances the class distribution by deleting randomly selected samples of the majority class. Condensed Nearest Neighbor (CNN)~\cite{hartCondensedNearestNeighbor1968} is also a simple and well-known technique that iteratively removes samples from the dataset using a 1 nearest neighbor decision rule. While these methods reduce the time taken to train a model and achieve the goal of balancing the classes, it is worth noting that they might also lead to the deletion of important data points resulting in a loss of information~\cite{seiffertRUSBoostImprovingClassification2008}. 
+
+Other, more informed undersampling algorithms have also been proposed, and mainly deal with better data cleaning procedures. Tomek proposed Tomek Link, a link removal technique~\cite{tomekTwoModificationsCNN1976} that tries to improve the CNN algorithm by including a rule that locates border point pairs that are engaged in border development (piecewise-linear). These pairings could be combined to create ever-simpler descriptions of approximations of the fully stated boundaries. Wilson proposed the Edited Nearest Neighbors (ENN) approach~\cite{wilsonAsymptoticPropertiesNearest1972}, which calculates $k=3$ nearest neighbours for each data point $x$ in the training set. If $x$ is a member of a majority class and is misclassified by its three closest neighbours, $x$ is removed from the train set. If, on the other hand, $x$ belongs to the minority class and is misunderstood by its three closest neighbours, the majority of the neighbors of that particular instance will be deleted. The NearMiss methods~\cite{maniKNNApproachUnbalanced2003a} refer to a group of undersampling algorithms that choose the instances based on the distance of the majority class instances to minority class instances. There are three alternatives to this technique, named NearMiss-1, NearMiss-2, and NearMiss-3. In the case of NearMiss-1, the majority class examples with the least average distance to the three nearest minority class examples are chosen. NearMiss-2 chooses the majority class examples with the shortest average distance to the three farthest minority class examples. For each example in the minority class that is closest, NearMiss-3 selects a set number of majority class examples.
+
+Several other informed undersampling methods have been proposed in the literature and are worth noting such as the Repeated Edited Nearest Neighbors (RENN)~\cite{tomekExperimentEditedNearestNeighbor1976}, the Neighborhood Cleaning Rule (NCR)~\cite{laurikkalaImprovingIdentificationDifficult2001}, the Instance Hardness Threshold (IHT)~\cite{smithInstanceLevelAnalysis2014}, and AllKNN~\cite{tomekExperimentEditedNearestNeighbor1976}. RENN is a variant of the ENN algorithm that applies the ENN method multiple times to the dataset which increases the number of removed cases. AllKNN works similarly to the RENN algorithm but it increases at each iteration the number of neighbors that are considered on the internal nearest neighbors algorithm. The NCR method removes the examples that fall in the union of the cases selected by ENN and the output of a 3-NN classifier. Finally, in the IHT Algorithm an initial classifier is trained on the original data. This classifier will be used to determine which instances have lower probabilities which are then removed.
+
+\subsubsection{Hybrid Resampling Techniques}
+Hybrid Resampling techniques involve the use of both oversampling the minority class and undersampling the majority class concurrently. Batista et al.\ presented two such algorithms, one called SMOTETomek~\cite{batistaBalancingTrainingData2003} which combines both oversampling and undersampling using SMOTE and Tomek links, and another called SMOTEENN~\cite{batistaStudyBehaviorSeveral2004} which combines SMOTE and ENN.\@
+
+\subsection{Meta-Learning}
+% The concept of MtL was first proposed by Schmidhuber~\cite{schmidhuber1987evolutionary} who contemplated the exchange between an agent and its environment, driving self-improvement in the agent. It integrates evolutionary algorithms and Turing devices to acquire chronic self-development in order for the agent to adapt to dynamic situations hastily and precisely. The majority of the early advancements in meta-learning came from meta-reinforcement learning, which aimed to improve robot autonomy and intelligence~\cite{peng2020comprehensive}. Meta-learning avoids the trouble of training a reinforcement learning model from scratch by modifying a well-trained model from a similar challenge. When jobs become too complex, training from start may not always provide a reliable answer. However, it is stated in~\cite{clune2019ai} and~\cite{wang2019paired} that meta-learning combined with a generative evolution scheme can address complicated problems that are impossible to solve by traditional training. 
+
+
+The broadest key idea of Meta-Learning (Mtl) is te development of a system that is able to use previously obtained experimental results to learn new tasks~\cite{vanschorenMetaLearningSurvey2018}. In our context, the goal of a meta-learning algorithm is to use past learning algorithms results to improve the performance of other learning algorithms. We direct the interested reader to extensive surveys on this area such as~\cite{vanschorenMetaLearningSurvey2018},~\cite{pengComprehensiveOverviewSurvey2020}.
+
+One of the most important applications of meta-learning in recent years has been few-shot learning~\cite{vinyalsMatchingNetworksOne2017},\cite{snellPrototypicalNetworksFewshot2017},\cite{gordonVersaVersatileEfficient2018},\cite{wangGeneralizingFewExamples2020}. According to \textcite{wangGeneralizingFewExamples2020}, the majority of gains in few-shot learning are in meta-learning. The most recently developed meta-learning approaches focused on few-shot classification. Given the significant amount of labelled data required to training deep learning models, meta-learning has been used with success for few-shot high-dimensional datasets. In effect, meta-learning gives representation models of moderate complexity for few-shot tasks without requiring a huge amount of labelled data by leveraging previous model experiences. %Few-shot learning is used in image classification~\cite{sun2020few} for tasks with \(K\) \((K<10)\) photos in each image class, often known as \(N\)-class \(K\)-shot issues. Humans have been found to learn new concepts with a few demonstrations and to use prior information to quickly identify a new category. The goal of strong AI is for machine learning models to achieve human-like learning capabilities. Researchers are looking for human-like machines that can generate fast and accurate classifications based on a small number of photos in few-shot learning.
+
+The recent applications of MtL primarily focus upon the combination of different machine learning frameworks to form Meta-Reinforcement and Meta-Imitation learning~\cite{jaafraReviewMetaReinforcementLearning2018},\cite{humplikMetaReinforcementLearning2019},\cite{dasguptaCausalReasoningMetareinforcement2019},\cite{nathanielMetaFluxMetalearningGlobal2023},\cite{duanOneShotImitationLearning2017}. 
+Meta-learning provides two critical advantages: it saves computation by avoiding the need to retrain deep models from scratch, and it improves reaction speed by adapting deep models to dynamic environment variables. In circumstances where out-of-distribution task prediction performance is required, meta-learning is a viable option. %Most deep learning models do not have a method like this by default and must be combined with a meta-learning framework to achieve this ability to generalise to out-of-distribution scenarios.
+
+In terms of multimodal data~\cite{agrawalMetalearningBasedGenerative2023} and~\cite{leiInnovativeApproachBased2023}, meta-learning can be used to learn the representation of such data from an incomplete dataset to a level where its performance matches that of a complete dataset that includes all modalities. In a word, it helps to reconstruct a missing modality using an existing modality. As for data sparsity, meta-learning is also good at efficiently learning broad features across tasks to better infer other poorly sampled ones. This approach~\cite{nathanielMetaFluxMetalearningGlobal2023} allows for the generation of a dataset that best represents critical information that tends to have few data points.
+
+There are also some improvements to traditional meta-learning algorithms. Recent structured meta-learning algorithms categorize tasks into various groups and employ centroid-based clustering to learn an initial setup for tasks within each group. However, those algorithms~\textcite{jerfelReconcilingMetalearningContinual2019} and~\textcite{zhouTaskSimilarityAware2021} require task models in the same group to be close together and fail to take into consideration of negative correlation between tasks. To address this problem,~\textcite{jiangMultiSubspaceStructuredMetaLearning2021} proposed a MUlti-Subspace structured Meta-Learning (MUSML) algorithm to learn the subspace bases for nonlinear models or general losses.
+
+Few solutions exist for dealing with the class imbalance problem through meta-learning. One of the most similar approaches to the METALLIC Algorithm we propose is the ATOMIC Algorithm presented in~\cite{monizAutomatedImbalancedClassification2021}. Our proposal differs from this work in three key ways. First, we do not use our meta-learning algorithm in the context of workflows evaluation, instead we use only models whose hyperparameters were tuned for the given predictive task and focus on learning the most effective resampling strategies for the given dataset considering that the end-user has selected a learning algorithm and is targeting to optimize a selected performance metric. Secondly, we consider a more extensive number of resampling techniques (19 instead of 6), learning algorithms (5 instead of 1) and target performance evaluation metrics (9 instead of 1). Finally, we extracted and used a larger number of meta-features from different groups that focus on the detection of different characteristics that might influence the learners performance under imbalanced domains, while the previous work uses more general meta-features.
+% they only use RF in the exps while we use mutiple learners; 6 resampling while we use 19
+%they focus on F1 we provide results to a set of x dif metrics
+
+\subsection{Performance Evaluation in Imbalanced Domains}
+In machine learning, there is no metric possible to
+be a general evaluation measure and used in various
+classification issues~\cite{wardhaniCrossvalidationMetricsEvaluating2019}. Therefore, we selected 9 important performance evaluations for targets: F-1 score, G-mean, Accuracy, precision, recall, AUC-ROC, AUC-PR, balanced accuracy, class-wise accuracy, 
+
+F1 score, which is the harmonic mean of precision and recall, is more sensitive to class imbalance. In imbalanced datasets, even a small number of false negatives or false positives can significantly impact the F1 score. The F1 score might be lower if the model performs well in the majority class but not as well on the minority class. Since F1 is sensitive to how well the model performs on each class, any imbalance in performance is directly reflected in the F1 score.
+
+G-mean takes into account the classification performance of different categories, especially in binary classification problems. It is the geometric mean of the True Positive Rate (TPR) of all categories. It considers the classification performance of all categories simultaneously. For imbalanced datasets, the Accuracy may be biased toward the majority class. G-mean provides a more comprehensive performance evaluation by balancing the true rates of different categories.
+
+Accuracy, as mentioned before, may be biased toward the majority class. However, it is still a critical evaluation metric and we will keep it as a target metric.
+
+In extremely imbalanced datasets, AUC-PR is often considered a more sensitive and useful performance metric than AUC-ROC, especially when the focus is on a small number of classes. This is because AUROC  evaluates the model’s ability to rank positive examples more highly than negative examples across all thresholds. AUC-PR provides a more realistic performance metric because it directly reflects the model's performance on positive samples (usually minority categories).
+
+Compared to Accuracy, Balanced Accuracy focuses on whether the model's performance on positive and negative classes is balanced, providing a balanced performance indicator in imbalanced datasets. CWA also focuses on classes but in a different way that takes consideration of importance of class and number of data by giving weights. It allows weighting adjustments to emphasize the importance of different categories.
+
+ 
+ \section{METALLIC: META Learning for cLass ImbalanCe} \label{sec:METALLIC}
+In this section, we describe our proposed meta-learning-based algorithm, METALLIC.\@ As previously stated, the principal objective of our proposed solution is to apply meta-learning in order to accurately predict the best resampling techniques for a given problem. To achieve this goal, we propose the extraction of a complex set of 5 types of meta-learning features from data characteristics, which are described in Section~\autoref{subsec:metaf}. Section~\autoref{subsec:resam} discusses the various resampling strategies used in our work. In Section~\autoref{subsec:setting} we present our predictive problem definition and Section~\autoref{subsec:learners} discusses the details of the learning algorithms hyperparameter optimization. Finally, the METALLIC Algorithm is introduced in Section~\autoref{subsec:algs} and three alternative learning algorithms used on the METALLIC Algorithm are discussed.
+
+\subsection{Meta-Features}\label{subsec:metaf}
+The performance of a predictive model is closely tied to the quality of the predictive variables used. In our setting, we aim at collecting the most descriptive and useful features that will allow an accurate prediction of the performance of applying a specific learning algorithm and resampling strategy to a dataset. The selected features must describe as much as possible the intrinsic characteristics of the data, which may be relevant for determining changes in the performance when different sampling strategies are applied. We selected 28 meta-features specially focused on the data complexity which we clustered into the following 5 categories: general, internal index-based, external index-based, hypersphere-based, and data complexity-based.
+
+All the five types of meta-features that we describe in the following section are used together with the multiple performance metrics results obtained when applying the different learners and resampling strategies to generate one dataset that is used for training our predictive models.
+
+\subsubsection{General Meta-Features}
+The general meta-features describe global key characteristics of the dataset including the number of rows and columns, the task type (binary or multiclass), and the imbalance ratio, as described below.
+
+\begin{itemize}
+    \item \textbf{Number of Rows}: The total number of rows present in the dataset before applying any resampling method.
+    \item \textbf{Number of Columns}: The total number of columns present in the dataset before applying any resampling method.
+    \item \textbf{Task Type}: The predictive classification task under consideration, can be binary, or multiclass. We will represent the task type with 0 or 1 if the classification task is binary or multiclass, respectively.
+    \item \textbf{Imbalance Ratio}: The imbalance ratio (IR) between the classes present in the dataset, which is evaluated before any resampling method is applied. We calculate the imbalance ratio as shown in Equation~\autoref{eq:IR}, where min represents the instances from the minority class and maj represents the instances from the majority class. For a multiclass task, we use the overall least represented class as the minority class and the most represented class as the majority class. 
+     \begin{equation}
+     IR= \frac{|min|}{|maj|}
+     \label{eq:IR}
+     \end{equation}
+\end{itemize}
+
+\subsubsection{Internal Index-based Meta-Features}
+This set of meta-features stems from clustering performance metrics. In this case, these metrics do not require the presence of the true class labels and are based on the intrinsic information of the dataset. We implemented these solutions using the K-Means++ algorithm~\cite{arthurKmeansAdvantagesCareful2007}.
+
+We start by introducing two auxiliary measures that are used for computing the meta-features described in this section. These two measures are the Sum of Squared Errors (SSE) and the total sum of squares (SST) and are defined in Equations~\autoref{eq:SSE} and \autoref{eq:SST}, respectively. For Equation~\autoref{eq:SSE} the $y_{i_c}$ indicates data points for cluster $c$, and $f(x_{i_c})$ indicates the centroid of the data points for cluster $c$, c means the number of clusters and $n$ means the number of data points in the cluster. Similarly, for Equation~ \autoref{eq:SST},  $y_i$ indicates data points, $\bar{y}$ the centroid, and $n$ the number of data points in the cluster. %Here, the total number of clusters possible is only one.
+
+\begin{equation}\label{eq:SSE}
+SSE =  \sum \limits_{c=1}^{C} \sum \limits_{i=1}^{n} (y_{i_c}-f(x_{i_c}))^2
+\end{equation}
+
+\begin{equation}\label{eq:SST}
+SST =\sum_{i=1}^{n}(y_{i}-\bar{y})^{2}
+\end{equation}
+
+\begin{description}
+\item[Silhouette Score:] The silhouette score measures how similar a case is to its cluster when compared to the surrounding clusters. The value of the silhouette score varies between $-1$ and $1$. The highest score represents that the given case matches well with its own cluster while the lower score represents that it does not match well~\cite{shahapureClusterQualityAnalysis2020}. We have calculated the Silhouette score using the Euclidean distance.
+   
+\item[Davies Bouldin Index:] One of the advantages of the Davies Bouldin (DB) index is that we are able to maximize the distance of inter-cluster while minimizing the distance among the points within the cluster. The DB index varies between 0 and 1, with 0 representing a clustering solution that provides better separation between the clusters~\cite{mittalClusteringEvaluationDaviesBouldin2020}.
+    
+\item[Cohesion Score:] Cohesion score is used to measure the similarity between the case and its own cluster. The higher the cohesion score, the higher the similarity between the case in a cluster. We have calculated the cohesion score by using SSE for all the classes present in the dataset.
+    
+\item[Root Mean Square deviation:] Root Mean Square deviation (RMSD) calculates the difference between the data points and the centroid of those data points. This value is always non-negative. The lower the error, the better the data model. Models with a lower error are preferred when compared to models with a higher error. The RMSD is calculated as shown in Equation~\autoref{eq:RMSD}, where $N$ represents the total number of data points.
+     \begin{equation}
+     \mathrm{RMSD} = \sqrt{\frac{SSE}{N}}
+     \label{eq:RMSD}
+     \end{equation}
+     
+    \item \textbf{Calinski-Harabasz Index}:
+    The Calinski Harabasz Index, also known as the variance ratio criterion, measures how similar an object is to its own cluster (cohesion), compared to other clusters (separation). Here, the cohesion is estimated based on the distances from the data points in a cluster to its cluster centroid, and the separation is based on the distance of the cluster centroids from the global centroid~\cite{calinskiDendriteMethodCluster1974}. The higher the score the better the performance.
+    
+    \item \textbf{Separation Score}: The separation score measures the similarity between an object to that of another cluster. This score is calculated as shown in Equation~\autoref{eq:separation} where $S$ stands for separation score.
+    \begin{equation}
+    S=SST-SSE
+    \label{eq:separation}
+    \end{equation}
+
+\item \textbf{R-Squared Index}: The R-squared (RS) index measures dissimilarity between clusters which means measuring the degree of homogeneity Citation. This value ranges from 0 to 1. With 0 signifying that there resemble no differences between the clusters and 1 that there is a significant difference. The RS index is calculated as described in Equation~\autoref{eq:RS}.
+    \begin{equation}
+      RS=(SST-SSE)/SST
+      \label{eq:RS}
+    \end{equation}
+    
+    \item \textbf{Xie and Beni Index}: The Xie and Benia (XB) index is mainly used for fuzzy clustering. It is defined as the quotient between the mean quadratic error and the minimum of the minimal squared distances between the points in the clusters~\cite{xieValidityMeasureFuzzy1991}. This index is calculated as described in Equation~\autoref{eq:XB}, where $R$ represents the total number of rows in the dataset and $D$ the minimum squared distance between points in the clusters.
+\begin{equation}
+  XB=SSE/(R*D)
+  \label{eq:XB}
+\end{equation}
+\end{description}
+
+\subsubsection{External Index-Based Meta-Features}
+The set of external index-based meta-features is derived from clustering performance metrics where the knowledge of the true class labels is necessary. These metrics evaluate how well the clustering solution matches the true classes. We implemented these solutions using the K-Means++ algorithm~\cite{arthurKmeansAdvantagesCareful2007}.
+
+\begin{itemize}
+ \item \textbf{Adjusted Random Score}:
+ The Adjusted Random Score (ARS)~\cite{steinleyPropertiesHubertArabieAdjusted2004} is based on the Rand Index (RI) which computes a similarity measure between two clustering solutions by considering all pairs of samples and counting pairs that are assigned in the same or different clusters in both the predicted and true clustering. The RI is calculated as shown in Equation~\autoref{eq:RI}, where C corresponds to the true class labels, K the clustering labels, a represents the number of pairs of cases that belong to the same set in C and in K, b represents the number of pairs of cases that belong to different sets in C and in K, and Comb is the total number of possible pairs in the dataset.
+ 
+ \begin{equation}\label{eq:RI}
+     RI = \frac{a+b}{Comb}
+ \end{equation}
+ 
+ 
+The ARS is a modification of the RI that faces an issue of RI related to its lack of guarantee that random label assignments will obtain a value close to zero. The ARS thus ensured to have a value close to 0 for random labeling independently of the number of clusters and samples and exactly 1 when the clustering solutions are identical. The formulation of ARS is shown in Equation~\autoref{eq:ARS}, where E[RI] represents the expected RI value.%, where TP is the number of true positives, TN is the number of true negatives, FP is the number of false positives, and FN is the number of false negatives.
+ 
+%  \begin{equation}
+%   ARS ={\frac {TP+TN}{TP+FP+FN+TN}}
+%   \label{eq:ARS}
+% \end{equation}
+ \begin{equation}
+  ARS ={\frac {RI-E[RI]}{max(RI)- E[RI]}}
+  \label{eq:ARS}
+\end{equation}
+%  The Adjusted Random Score (ARS)~\cite{steinley2004properties}, or Rand Index, computes a similarity measure between two clustering solutions by considering all pairs of samples and counting pairs that are assigned in the same or different clusters in both the predicted and true clustering. The ARS is thus ensured to have a value close to 0 for random labeling independently of the number of clusters and samples and exactly 1 when the clustering solutions are identical. The formula used is shown in Equation~\autoref{eq:ARS}, where TP is the number of true positives, TN is the number of true negatives, FP is the number of false positives, and FN is the number of false negatives.
+ 
+%  \begin{equation}
+%   ARS ={\frac {TP+TN}{TP+FP+FN+TN}}
+%   \label{eq:ARS}
+% \end{equation}
+ 
+    \item \textbf{Adjusted Mutual Information Score}: The Adjusted Mutual Information (AMI) is a measure that provides an adjustment of the Mutual Information (MI) score to account for chance. It addresses the fact that the MI is generally higher for two clustering with a larger number of clusters, regardless of whether there is actually more information shared~\cite{vinhInformationTheoreticMeasures2010}. The AMI returns a value of 1 when the two partitions are identical (i.e.\ perfectly matched). Random partitions (independent labellings) have an expected AMI near 0 on average.
+
+    \item \textbf{Fowlkes-Mallows Index}: The Fowlkes-Mallows index (FMI)~\cite{fowlkesMethodComparingTwo1983} measures the similarity of two clustering solutions obtained for a set of points. FMI is defined as the geometric mean between the precision and recall, which ranges between 0 and 1. A high value indicates a good similarity between two clusters. The formula for calculating FMI is shown in Equation~\autoref{eq:FMI}, where TP is the number of true positives, FP is the number of false positives, and FN is the number of false negatives.
+    \begin{equation}
+        FMI = \frac{TP}{\sqrt{(TP + FP) * (TP + FN)}}
+    \label{eq:FMI}
+    \end{equation}
+    
+    \item \textbf{Normalized Mutual Information Score}: The Normalized Mutual Information (NMI)~\cite{amelioNormalizedMutualInformation2015} between two clustering solutions is a normalization of the MI score to scale the results between 0 (no mutual information) and 1 (perfect correlation).
+\end{itemize}
+ 
+\subsubsection{Hypersphere-based Meta-Features}
+This set of features relies on the definition of hyperspheres. By using these hypersphere-based meta-features, we aim to extract relevant information regarding class overlap and small disjuncts, concepts that have been shown to have a significant impact on the performance of resampling methods~\cite{brancoSurveyPredictiveModeling2016}. The basic idea used to build the hyperspheres is to consider an $\epsilon$-neighborhood topology to build successive adherence subsets with points that belong to the same class~\cite{waltDataMeasuresThat2008}. To achieve this, we start by putting all data points inside a pool and shuffle. The initial point in the pool is taken and considered as the center of the first hypersphere, and the class of this point is recorded. Then, we find the nearest point using the Euclidean distance and check if it is of the same class. If the nearest point found belongs to the same class, we assign it to the hypersphere and update the hypersphere centroid. We continue to grow the adherence subset until a point from a different class is found. This process is repeated until all the points in the pool are assigned to one of the hyperspheres.
+
+
+\begin{itemize}
+    \item \textbf{Total number of Hypersphere}: In this meta-feature, we calculate the total number of hyperspheres that are formed within all the classes present in the dataset.
+    
+    \item \textbf{Number of Hypersphere for Minority Class}:
+    This meta-feature uses the total number of hyperspheres that are obtained considering only the minority class of the dataset. Our intuition for using this measure is that when the number of minority class hyperspheres is small, this indicates that data inside that class is clustered well, i.e., the dispersion of the minority class examples is small. For the multiclass scenario, we use the least frequent class for this calculation.
+    
+    \item \textbf{Number of Hyperspheres for Majority Class}:
+    Similar to the previous measure, in this meta-feature, we calculate the total number of hyperspheres that are obtained exclusively for the majority class. This will provide some indication of the dispersion of the majority class examples. For the multiclass scenario, we use the most frequent class for this calculation.
+    
+    \item \textbf{Sample per Hypersphere}: This meta-feature calculates the average number of examples that are inside a hypersphere.
+    
+    \item \textbf{Sample per Hypersphere for Minority Class}: This meta-feature is calculated as shown in Equation~\autoref{sph1}, where $I_{min}$ is the total number of instances in the minority class and $H_{min}$ is the total number of hyperspheres formed for the minority class.
+    \begin{equation}
+        Sample\_per\_Minority\_class = \frac{I_{min}}{H_{min}}
+     \label{sph1}
+    \end{equation}
+
+     \item \textbf{Sample per Hypersphere for Majority Class}: This meta-feature is calculated as shown in Equation~\autoref{sph2}, where $I_{maj}$ is the total number of instances in the majority class and $H_{maj}$ is the total number of hyperspheres formed for the majority class.
+     \begin{equation}
+        Sample\_per\_Majority\_class = \frac{I_{maj}}{H_{maj}}
+    \label{sph2}
+    \end{equation}
+    
+     \item \textbf{Average Distance Between Classes}:
+     This meta-feature represents the average distance between each class. This is calculated by averaging the distance between the centroids of the hyperspheres of each class. It provides some information regarding the closeness of each class.
+     
+     \item \textbf{Volume of Overlap}:
+     This meta-feature provides information about the existing overlap on the dataset features between the different classes. We first calculate the overlapping area of each feature between two pairs of classes. Then, we average these results. 
+\end{itemize}
+
+
+\subsubsection{Data Complexity-based Meta-Feature}
+In this section, we describe four data complexity metrics described by Barella et al.~\cite{barellaAssessingDataComplexity2021} that aim at characterizing the complexity of a given classification task. All of these complexity metrics are based on the k-nearest neighbor approach.
+
+\begin{itemize}
+ \item \textbf{CM: Complexity metric}: Anwar et al.~\cite{anwarMeasurementDataComplexity2014} proposed this metric to capture data complexity by focusing on local information for each data item via the nearest neighbours. For each data point, it finds $k$ nearest neighbours, where $k$ is odd. If the majority of the neighbours are from the same class, the data point is labeled as easy; otherwise, it is labeled as difficult. Equation~\autoref{eqn:complexity} shows how complexity is measured.
+ 
+ \begin{equation}
+ \label{eqn:complexity}
+  CM(T, k)=\frac{1}{n_{c_{1}}} \sum_{i=1}^{n_{c_{i}}} I\left(\frac{\sum_{j=1}^{k} I\left(N N_{j}\left(\mathbf{x}_{i}^{c_{1}}\right) \neq c_{1}\right)}{k}>0.5\right)
+ \end{equation}
+
+ The local information for each data point in the dataset is the focus of the CM based on the k-nearest neighbour technique. The CM's performance is heavily influenced by the neighbourhood size $k$: if $k$ is too small, it will result in mislabeled data points; if $k$ is too high, it will result in numerous outliers from the other class within the neighbourhood. Furthermore, because it includes the majority voting merging the class labels for the dataset, the nearest neighbour approach might lead to erroneous findings for datasets in which nearest neighbours vary greatly in their distances and the closer ones more accurately reflect the class of a data point. To resolve these issues, Singh et al.~\cite{singhWeightedKnearestNeighbor2020} proposed two complexity metrics: weighted complexity metric (wCM) and dual-weighted complexity metric (dwCM) based on the weighted voting methods to address the above issues with nearest-neighbor based complexity measurement.
+ 
+ \item \textbf{wCM: Weighted Complexity metric}: The wCM determines the difficulty level of datasets by assigning weights based on the distances between a data point's k-nearest neighbours. The method focuses on using distance-weighted nearest neighbours to assess the complexity of each data point. 
+ Each neighbour $j$ of each minority class instance $i$ has a weight defined by their distance on this measure. The distances between the closest and farthest neighbours are used to standardize the weights. $W_{i j}$ represents the weight of the $j$-th neighbour of the $i$-th minority instance and is calculated as shown in Equation~\autoref{eq:wij1}. These weights are then used for the calculation of wCM as displayed in Equation~\autoref{eq:wCM}.
+ \begin{equation}\label{eq:wij1}
+     W_{i j}=\left\{\begin{array}{l}
+\frac{d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)-d\left(\mathbf{x}_{i}, N N_{j}\left(\mathbf{x}_{i}\right)\right)}{d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)-d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right)}, \text { if } d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right) \neq d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right) \\
+1, \text { if } d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)=d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right)
+\end{array}\right.
+ \end{equation}
+ \begin{equation}\label{eq:wCM}
+     w C M(T, k)=\frac{1}{n_{c_{1}}} \sum_{i=1}^{n_{c_{i}}} I\left(\frac{\sum_{j=1}^{k} W_{i j} I\left(N N_{j}\left(\mathbf{x}_{i}^{c_{1}}\right) \neq c_{1}\right)}{\sum_{j=1}^{k} W_{i j}}>0.5\right)
+ \end{equation}
+ 
+ \item \textbf{dwCM: Dual Weighted Complexity metric}: By multiplying the weight calculation method used for the wCM by another new weight function, the dwCM finds the dual weight of the nearest neighbours. Unlike wCM this metric reduces the weight of each nearest neighbour except for the first and $k$-th nearest neighbor. As a result, it can avoid assigning outliers too much weight by lowering the weights of other neighbours in the collection of k-nearest neighbours for each data point. The dwCM metric can thus handle outliers in a data space's local region. In dwCM, the weights are calculated as shown in Equation~\autoref{eq:W2}.
+ \begin{equation}\label{eq:W2}
+W_{i j}=\left\{\begin{array}{l}
+\frac{d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)-d\left(\mathbf{x}_{i}, N N_{j}\left(\mathbf{x}_{i}\right)\right)}{\left.d\left(\mathbf{x}_{i}, N N_{k} \mathbf{x}_{i}\right)\right)-d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right)} \times \frac{d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)+d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right)}{d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)+d\left(\mathbf{x}_{i}, N N_{j}\left(\mathbf{x}_{i}\right)\right)} \\
+\text { if } d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right) \neq d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right) \\
+1, \text { if } d\left(\mathbf{x}_{i}, N N_{k}\left(\mathbf{x}_{i}\right)\right)=d\left(\mathbf{x}_{i}, N N_{1}\left(\mathbf{x}_{i}\right)\right)
+\end{array}\right.
+\end{equation}
+ 
+ \item \textbf{Bayes Imbalance Impact Index.} Lu et al.~\cite{luBayesImbalanceImpact2019} proposed a measure called the Bayes Imbalance Impact Index, inspired by Bayes optimal classifier. It is calculated as shown in the equations below.
+ \begin{equation}
+    f_{n}\left(\mathbf{x}_{i}, k\right)=\frac{\sum_{j=1}^{k}\left[\left(N N_{j}\left(\mathbf{x}_{i}\right) \neq c_{1}\right)\right.}{k}
+\end{equation}
+\begin{equation}
+f_{p}\left(\mathbf{x}_{i}, k\right)=\frac{\sum_{j=1}^{k}\left(\left(N_{j}\left(\mathbf{x}_{i}\right)=c_{1}\right)\right.}{k} 
+\end{equation}
+\begin{equation}
+f_{p}^{\prime}\left(\mathbf{x}_{i}, k\right)=\frac{n_{c_{0}}}{n_{c_{1}}} \times f_{p}\left(\mathbf{x}_{i}, k\right)
+\end{equation}
+
+\begin{equation}
+\mathrm{BI}^{3}(T, k)=\frac{1}{n_{c_{1}}} \sum_{i=1}^{n_{c_{i}}} \frac{f_{p}^{\prime}\left(\mathbf{x}_{i}, k\right)}{f_{n}\left(\mathbf{x}_{i}, k\right)+f_{p}^{\prime}\left(\mathbf{x}_{i}, k\right)}-\frac{f_{p}\left(\mathbf{x}_{i}, k\right)}{f_{n}\left(\mathbf{x}_{i}, k\right)+f_{p}\left(\mathbf{x}_{i}, k\right)}
+\end{equation}
+\end{itemize}
+
+All four of the above-mentioned measures are parameter-dependent. The user must set the parameter k, and their choice may affect the measure's outcome. For example, Singh et al.~\cite{singhWeightedKnearestNeighbor2020} found that CM and wCM might be affected by parameter selection. We used $k$=5, as suggested by Lu et al.~\cite{luBayesImbalanceImpact2019}. 
+
+\subsection{Resampling Techniques}\label{subsec:resam}
+The extraction of results when using different resampling techniques is a core part of our proposal. We generate these values, that will be used as features for our problem, by applying multiple resampling techniques to the 107 datasets and collecting the performance achieved for each combination of resampling technique, learning algorithm and performance assessment metric considered. 
+Table~\autoref{samplingtechniques} shows the main undersampling, oversampling and hybrid strategies we considered. We applied each one of the resampling techniques in order to obtain a balanced training dataset. We also used the original data set without the application of any resampling method and considered it as a valid alternative. We opted to include this alternative because it is known that, in some cases, using resampling techniques may not be useful or may even be harmful. This way we can also recommend to the end-user not applying a resampling technique if that is amongst the most effective ways of dealing with the predictive task.
+
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Over sampling} & \textbf{Under sampling} \\
+\midrule
+Random over sampling & Random under sampling \\
+SMOTE & Cluster centroids \\
+Borderline-SMOTE & Near Miss Version 1, 2, 3 \\
+SVM-SMOTE & Tomek links \\
+ADASYN & Edited Nearest Neighbours \\
+SMOTE NN & Repeated Edited Nearest Neighbours \\
+SMOTE Tomek & All KNN \\
+& Condensed Nearest Neighbour \\
+& Neighbourhood Cleaning Rule \\
+& Instance Hardness Threshold \\
+\bottomrule
+\end{tabular}
+\caption{Resampling techniques applied, clustered by category.}\label{samplingtechniques}
+\end{table}
+
+
+ 
+
+\subsection{Multitarget Setting Definition}\label{subsec:setting}
+
+We assume that the end-user might be interested in obtaining the best resampling strategies to apply when considering different performance metrics. For instance, for a given dataset an focus on F1 might be targeted at a given point. However, at another moment given some domain constraints, for the same dataset, the end-user might want to focus on achieving the best overall G-Mean. To cope with these scenarios we framed our algorithm as a multitarget variable problem. More precisely, we selected nine different target variables, each one storing the value obtained by one of the following performance assessment metrics: F1 score, G-mean, Accuracy, Precision, Recall, AUC-ROC, PR-AUC, Balanced Accuracy, and CWA. This means that the end-user will be able to provide the metric he is interested in and will obtain the best resampling techniques to use for that metric. We consider this to be a relevant aspect because it is known that using different performance metrics can lead to different results, thus, the best resampling techniques to apply may change when we consider different performance metrics.
+
+We use TP, FP, and FN to represent the number of true positive, false positive, and false negative cases. Equation~\autoref{tpr} and Equation \autoref{fpr} provide two auxiliary metrics that we use. The metrics we computed and that the end-user can select as target metric in our METALLIC Algorithm are displayed from Equation~\autoref{eqn:acc} to Equation~\autoref{cwa-multi}. Besides these metrics we also computed the Area Under the the receiver operating characteristic (ROC) curve (AUCROC) and Area Under the Precision-Recall curve (AUCPR) for the binary classification problems. Overall the end-user will be able to select among 9 possible metrics which are frequently used for performance evaluation in the context of imbalanced domains~\cite{brancoSurveyPredictiveModeling2016}. We must note that accuracy is not among the usually recommended measures but we decided to include it for completeness. 
+
+% Accuracy is calculated as shown in Equation~\autoref{eqn:acc}. G-mean is calculated as shown in Equation~\autoref{gm} where $n$ represents the total number of different classes in the dataset. Precision and recall are calculated as shown in Equation~\autoref{pre} and \autoref{re}, respectively. We used TP, FP, and FN to represent the number of true positive, false positive, and false negative cases. Equation~\autoref{eqn:f1} provides the definition of F1 score. We have used sklearn.metrics module for all the 4 metrics except G-mean for which we used imblearn.metrics module. For the binary class datasets we set to 'binary' the average parameter in the F1 score function, accuracy score function, geometric mean function, recall function, and precision function, whereas for the multiclass datasets the average parameter was set to 'macro' for F1 score, was set to 'multiclass' for geometric mean, and was set to `weighted' for recall and precision. 
+
+% When analyzing the performance of binary classification methods, the receiver operating characteristic (ROC) curve is usually utilized. Rather than a single value like most other metrics, it displays a graphical depiction of a classifier's performance. Calculating and displaying the true positive rate as in Equation \autoref{tpr} versus the false positive rate as in Equation \autoref{fpr} for a single classifier at various thresholds yields the ROC curve. While seeing a classifier's ROC curve is valuable, we can often reduce this information to a single statistic - the Area Under the Curve (AUC). The greater the AUC value, the better a classifier performs for the job at hand. For various thresholds, the precision-recall curve depicts the tradeoff between precision and recall. A large area under the curve indicates strong recall and precision, with high accuracy indicating a low false positive rate and high recall indicating a low false negative rate. With unbalanced data, balanced accuracy is a preferable statistic to utilize. It takes into account both positive and negative result classifications and avoids misleading data. The average of sensitivity and specificity yields balanced accuracy as shown in Equation \autoref{balacc}. When you have unbalanced data and don't care whether you properly anticipate the negative or positive classes, balanced accuracy (BalAcc) is a useful statistic to use. Finally, we have also considered the Class-Weighted Accuracy (CWA) This performance measure attempts to address the metrics' problem of not accounting for performance in the negative class. At the same time, it seeks to address G-Mean's, flaw which is that it does not enable us to give the minority class greater weight. The CWA metric attempts to address these issues by allowing the user to define the weights to be used for each class $c$, with 0 ≤ $w_c$ ≤ 1 being the user-defined class weights. We used Equation \autoref{cwa-multi} to compute CWA.
+
+\begin{equation}
+TPR=\text { Sensitivity }=\frac{T P}{T P+F N}
+\label{tpr}
+\end{equation}
+\begin{equation}
+FPR=1-\text { Specificity }=\frac{F P}{F P+T N}
+\label{fpr}
+\end{equation}
+
+
+
+\begin{equation}
+  Accuracy= \frac{|correct\_predictions|}{|number\_of\_cases|}
+  \label{eqn:acc}
+\end{equation}
+\begin{equation}
+  G-mean%(rec_{1},rec_{2},...,rec_{n})
+  = \left (\prod_{i=1}^{n}{rec_{i}} \right )^{\frac{1}{n}}
+  \label{gm}
+\end{equation}
+
+\begin{equation}
+  Precision = \frac{TP}{TP + FP}
+  \label{pre}
+\end{equation}
+\begin{equation}
+  Recall = \frac{TP}{ TP + FN}
+  \label{re}
+\end{equation}
+\begin{equation}
+  F1\_score = \frac{2 * (precision * recall)}{precision + recall}
+  \label{eqn:f1}
+\end{equation}
+\begin{equation}
+\text { Balanced Accuracy }=(\text { Sensitivity }+\text { Specificity }) / 2
+\label{balacc}
+\end{equation}
+% \begin{equation}
+% CWA=w \cdot \text { sensitivity }+(1-w) \cdot \text { specificity }
+% \label{cwa-bin}
+% \end{equation}
+
+\begin{equation}
+CWA=\sum_{c \in \mathbb{C}} w_{c} \cdot \operatorname{recall}(c)
+\label{cwa-multi}
+\end{equation}
+
+
+\subsection{Learning Algorithms and Hyperparameter Tuning}\label{subsec:learners}
+
+We tested the following five learning algorithms: K-Nearest Neighbors (KNN), Support Vector Machines (SVM), Random Forest (RF), Gaussian Naive Bayes (GNB), and Decision Tree (DT). We have used the Python Hyperopt package to carry out hyperparameter optimization. We applied Bayesian Optimization as the search algorithm for hyperparameter tuning.%, to determine the best parameters for all the learner functions. The learner used is also included as a meta-feature in our metadata.
+
+We applied a 5-fold Cross Validation procedure to estimate the average value of each metric for each pair of learning algorithm and resampling technique.
+
+
+The following parameters of the learning algorithms were optimized. For the DT, the splitter, maxdepth, and criterion parameters were optimized in the alternative choices provided as follows - best, random for splitter; gini, entropy for criterion and a choice between (1, 7) for maxdepth. For KNN, the weight, and n-neighbors parameters were optimized in the alternative choices provided as follows - uniform, distance for weight; and a choice between (1, 9) for n-neighbors. For GNB, the default parameters were considered. For SVM, the kernel and gamma parameters were optimized in the alternative choices provided as follows - rbf, poly, sigmoid for kernel; and scale, auto for gamma. For RF, the n-estimator, maxdepth, and criterion parameters were optimized in the alternative choices provided as follows - a choice between (100, 500) in increments of 100 for n-estimator; gini, entropy for criterion, and a choice between (1, 7) for maxdepth.
+
+
+\subsection{METALLIC Algorithm}\label{subsec:algs}
+The goal of our proposed algorithm is to develop a recommendation system based on a user-selected metric and learner. The recommendation system should provide the best resampling techniques that can be applied to the new dataset being tested given its characteristics. Our system includes two phases: a training phase and a testing phase. The key elements of the training phase are shown in Figure~\autoref{Training}, while the testing phase is depicted in Figure~\autoref{Testing}. 
+
+\begin{figure}[!hbt]
+\includegraphics[scale=0.9]{METALLIC1.png}
+\centering
+\caption{Training Phase of METALLIC Algorithm.}\label{Training}
+\end{figure}
+
+
+\begin{tikzpicture} 
+\end{tikzpicture}
+
+For the training phase, we first collect different types of imbalanced classification datasets, and from these datasets, we calculate the meta-features previously described. This will be the metadata that will be used in the training of our meta-learning algorithm. Then, the datasets are resampled using one of the different resampling techniques (including the option of not using any resampling technique), and one of the different classifiers is trained and evaluated to obtain the target values that correspond to the nine defined assessment metrics: Accuracy, Precision, Recall, G-mean, F1 score, ROC-AUC, PR-AUC, BalAcc, and CWA. The metrics results will correspond to our multiple target variables (Y) that our meta-learner will try to predict. A model is trained on the meta-features, the encoded resampling techniques and classifier used and the metrics.
+
+In the testing phase, the user starts by providing the dataset on which the resampling recommendation is needed and also selects the performance metric and learner for which the recommendation should be obtained. Then, the meta-features of that dataset are calculated. These meta-features, along with the selected metric and selected classifier are fed into the previously trained model and finally, we obtain the predicted ranking for the resampling techniques on the test data. The ranking of the resampling techniques is obtained after the conversion of the model predictions into a ranking. Depending on the learner used to obtain this model, the conversion to ranking will be more or less complex. We discuss the learning algorithms used at this stage next.
+
+\begin{figure}[!ht]
+\includegraphics[scale=0.9]{testing.PNG}
+\centering
+\caption{Testing Phase of METALLIC Algorithm.}\label{Testing}
+\end{figure}
+
+To build our METALLIC Algorithm, 3 different alternatives were tested for the learner. The first one uses the notion of nearest neighbors, the second one uses a regression algorithm, and the third one uses a deep learning approach. 
+
+The pseudo-code for METALLIC using the nearest neighbor approach is shown in Algorithm~\autoref{alg:metallic_nearest_neighbors}. We use as input the training metadata with the meta-features previously described. We also compute the meta-features of the dataset for which we want to obtain the recommendations with the given learning algorithm and metric. As for the result of this algorithm, the user will obtain the top best resampling strategies to apply. For this, the user must also provide the number $T$ of top best resampling strategies to be returned. METALLIC using the nearest neighbor approach starts by evaluating the distance between the meta-features of the test data and training data. Finally, we selected the top 3 train cases which are closest to the test case. We use the Euclidean distance for this computation. After determining which cases are the closest to the test case, we rank all the resampling techniques by their success for the metric and learner the user selected. Finally, we output the top $T$ resampling techniques, as desired by the end-user. 
+
+
+
+\begin{algorithm}[!ht]
+    \caption{METALLIC Algorithm using Nearest Neighbors}\label{alg:metallic_nearest_neighbors}
+\begin{algorithmic}[1]
+\Require$MetaTrain$, $Test$, $M$, $L$, $T$
+\Ensure{}Recommend $T$ best resampling techniques
+\State$MetaTest\gets\texttt{compute\_metafeatures}(Test)$
+\For{$k\gets1$ \textbf{to} $|MetaTrain|$}
+    \State$calculated\_distance[k]\gets\texttt{distance}(MetaTrain[k],MetaTest)$
+    \EndFor{}
+\State$closest\_distances\gets\texttt{get\_three\_least}(calculated\_distance)$
+\For{$i\gets1$ \textbf{to} $3$}
+    \State$metric\_values[i]\gets closest\_distances[i].M$
+    \EndFor{}
+%\State$metric\_values\gets[closest\_distances[i].M\text{ for }i\text{ in }1..3]$
+\State$mean\_metric\gets\texttt{mean}(metric\_values)$
+\State$ranking\gets\texttt{resampling\_ranking}(mean\_metric)$
+\State$best\_T\_resampling\gets\texttt{get\_top\_T}(ranking)$
+\end{algorithmic}
+\end{algorithm}
+
+
+
+\begin{algorithm}
+\caption{METALLIC Algorithm using a Regression Model}\label{alg:metallic_regression}
+\begin{algorithmic}[1]
+\Require$MetaTrain$, $Test$, $M$, $L$, $T$
+\Ensure{} Recommend the $T$ best resampling techniques
+\State$Xtest\gets\texttt{compute\_metafeatures}(Test)$
+\State$Xtrain\gets\texttt{subset}(MetaTrain,\text{learner}=L,\text{exclude\_target}=\text{true})$
+\State$Ytrain\gets\texttt{subset}(MetaTrain,\text{learner}=L,\text{only\_target}=M)$
+\State$Model\gets\texttt{train\_Regression}(Xtrain,Ytrain)$
+\State$Ypred\gets Model(Xtest)$
+\State$Ranking\_Ypred\gets\texttt{ranking}(Ypred)$
+\State$top\_T\_resampling\gets\texttt{Top\_resampling}(T,Ranking\_Ypred)$
+\end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+\caption{METALLIC Algorithm using a Deep Learning Model}\label{alg:metallic_deep}
+\begin{algorithmic}[1]
+\Require$MetaTrain$, $Test$, $M$, $L$, $T$
+\Ensure Recommend the $T$ best resampling techniques
+\State$Xtest\gets\texttt{compute\_metafeatures}(Test)$
+\State$Xtrain\gets\texttt{subset}(MetaTrain,\text{learner}=L,\text{exclude\_target}=\text{true})$
+\State$Ytrain\gets\texttt{subset}(MetaTrain,\text{learner}=L,\text{only\_target}=M)$
+\State$Model\gets\texttt{create\_model}()$
+\State$Model.\texttt{add\_dense\_layer}(64,\text{activation}=\text{relu})$
+\State$Model.\texttt{add\_dense\_layer}(32,\text{activation}=\text{relu})$
+\State$Model.\texttt{add\_dense\_layer}(16,\text{activation}=\text{relu})$
+\State$Model.\texttt{add\_dense\_layer}(8,\text{activation}=\text{relu})$
+\State$Model.\texttt{add\_dense\_layer}(1)$
+\State$Model\gets\texttt{train\_DeepLearning}(Xtrain,Ytrain)$
+\State$Ypred\gets Model(Xtest)$
+\State$Ranking\_Ypred\gets\texttt{ranking}(Ypred)$
+\State$top\_T\_resampling\gets\texttt{Top\_resampling}(T,Ranking\_Ypred)$
+\end{algorithmic}
+\end{algorithm}
+
+
+Algorithm~\autoref{alg:metallic_regression} shows the pseudo-code for METALLIC using a regression model. We selected XGBoost as the regression algorithm. We used the following parameters: colsample\_bytree=0.4, gamma=0, learning\_rate=0.07, max\_depth=3, min\_child\_weight=1.5, n\_estimators=10000, reg\_alpha=0.75, reg\_lambda=0.45, subsample=0.6. This algorithm starts by computing the meta-features of the test set provided. We then filter the meta-features of the training set for the end-user selected learning algorithm. The regression model is trained only on this subset of cases. After obtaining the model, we test it with the meta-features extracted from the test dataset and obtain the corresponding predicted selected metric. Finally, the values of the predicted metric are ranked and the algorithm outputs the top $T$ best resampling strategies corresponding to the top values determined. 
+
+Finally, Algorithm~\autoref{alg:metallic_deep} shows the pseudo-code for METALLIC using a deep learning model. We selected to use a deep learning algorithm with the following fully connected layers: 3 hidden layers, 1 input and 1 output layer. The used the following architecture for our deep learning model: the first input layer has 64 input nodes, the second layer has 32 hidden nodes, the third layer has 16 nodes, the fourth layer has 8 nodes, and finally, the output layer has 1 output node. All the internal layers have a rectified linear activation function. %and the output node does not have any output activation function. 
+All the nodes and layers are fully connected. This algorithm begins by computing the meta-features of the test set provided. Then, the instances of the training set that use the end-user selected learning algorithm and metric are extracted. The deep learning model is trained exclusively on this subset. After obtaining the model, it is tested with meta-features extracted from the test dataset and the corresponding predicted selected metric is obtained. Finally, the values of the predicted metric are ranked and the algorithm outputs the top $T$ best resampling strategies corresponding to the top values determined.
+
+The three presented approaches allow to obtain a ranking of resampling strategies for a new test set. However, they function in completely distinct ways and we need to evaluate their individual performance to determine the best solution to apply in this case. When compared to the regression option, METALLIC utilising nearest neighbors is the less sophisticated and most naive approach. In fact, it obtains the optimum resampling strategies merely by inspecting the resampling strategies rankings on the test dataset's three neighbours. On the other hand, in METALLIC using a regression model, we first train the model with all the metafeatures which is more time consuming. Similarly, the deep learning model too first trains the model with all the metafeatures and then predicts on the test dataset and then ranks them which is highly time consuming compared to the nearest neighbours approach. 
+
+
+\section{Methodology}\label{sec:methodology}
+In this section we provide the methodology and details of the  experimental evaluations carried out. Namely, we provide characteristics of the used datasets, the applied resampling techniques and learning algorithms and the performance assessment metrics examined.  
+
+\subsection{Datasets}
+We selected a total of 107 imbalanced datasets including both binary and multiclass classification tasks. The datasets were obtained from KEEL~\cite{alcala-fdezKEELDataMiningSoftware2011} repository. Table~\autoref{tab:ds} shows the main characteristics of these datasets. The datasets, as well as further information about them can be obtained in \url{https://github.com/sai-akhil/Metallic} and KEEL repository.
+
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+Characteristic & Min & Max & Median & Mean & STD \\
+\midrule
+Number of Rows & 20 & 7,399 & 336 & 883.55 & 1,405.58 \\
+Feature Count & 3 & 147 & 10 & 18.82 & 22.79 \\
+Classes Count & 2 & 30 & 2 & 3.59 & 3.99 \\
+Minority Class Count & 5 & 3,697 & 54 & 178.80 & 479.42 \\
+Imbalanced Ratio & 0.0022 & 1.00 & 0.345 & 0.40 & 0.32 \\
+\bottomrule
+\end{tabular}
+\captionsetup{justification=centering}
+\caption{Main characteristics of the 107 selected datasets.}\label{tab:ds}
+\end{table}
+
+
+We observe that the selected datasets have a high diversity in terms of their main characteristics. There is a wide variation range in all the main statistics computed including the number of rows, number of features, number of classes, number of minority class examples and imbalance ratio.
+
+\subsection{Resampling techniques}
+%Whenever we are dealing with imbalanced data, the model built may not be accurate enough to predict the minority class instances. This motivates the use of resampling techniques such as oversampling, undersampling or balanced sampling to level and equal the number of instances in each class so that the model is not skewed. 
+We selected a large number of resampling strategies and tried to focus on the most commonly used. The oversampling techniques used in this paper are: Borderline-SMOTE, Random over sampling, SMOTE, SVM-SMOTE, ADASYN. Regarding the undersampling methods, we selected the following techniques: Random undersampling, Cluster centroids, Near Miss version 1, Near Miss version 2, Near Miss version 3, Tomek links, Edited Nearest Neighbours, Repeated Edited Nearest Neighbours, AllKNN, Condensed Nearest Neighbour, Neighbourhood Cleaning Rule, Instance Hardness Threshold. Finally, we also included the following two hybrid sampling techniques: SMOTE ENN and SMOTE Tomek. All resampling techniques used in this work are implemented in the ``imblearn"\footnote{\url{https://imbalanced-learn.org/stable/user_guide.html}} library and the parameters used are the default ones. We also included in our experiments the use of the original dataset, which we named ``None" as no resampling strategy is applied.
+
+
+\subsection{Learning Algorithms and Performance Assessment}
+To validate our results and determine which one of the three proposed learning systems works best for our task we have used four performance assessment metrics. These selected metrics aim at comparing the system predicted rank against the actual true rank of the different resampling techniques for a task. Below is a more detailed description of the four selected metrics:
+\begin{itemize}
+\item \textbf{Kappa Score:} Measures the agreement between the actual ranking and the predicted ranking. Cohen's kappa measures the level of agreement between two annotators~\cite{cohenCoefficientAgreementNominal1960}. This score ranges from -1 to 1, with 1 representing complete agreement. The Kappa score is calculated as:
+    \begin{equation}
+        \text{Kappa} = \frac{P - A}{1 - A}
+        \label{eq:kappa}
+    \end{equation}
+Where $P$ is the empirical probability of the predicted ranking and $A$ is the empirical probability of the actual ranking.
+
+\item \textbf{Krippendorff's Score:} A measure of inter-rater reliability~\cite{hayesAnsweringCallStandard2007}. The higher the Krippendorff's alpha, the greater the agreement between observers.
+
+\item \textbf{Precision@k:} Assesses if the top $k$ recommended resampling techniques match the top $k$ techniques in the actual ranking (ground truth). Precision@k is calculated as:
+    \begin{equation}
+        \text{Precision@k} = \frac{B}{k}
+        \label{eq:precision}
+    \end{equation}
+Where $k$ is the number of top resampling techniques observed, and $B$ is the number of resampling methods common to both the recommended and true top $k$ lists. In our experiments, we used $k = 5$.
+
+\item \textbf{Mean Square Error (MSE):} Calculates the average of the squared error between the actual and predicted scores. A lower MSE indicates better performance. This measure was used to assess solutions that predicted a value for one of the performance metrics before transformation into rankings, allowing us to evaluate how close the predicted score (e.g., F1-score) for a given resampling technique is to the observed true score.
+\end{itemize}
+
+
+\subsection{Experimental Setting}
+For carrying out the assessment of the three METALLIC algorithms proposed, a leave-one-out cross validation (LOOCV) technique was applied. This technique iteratively uses one of the cases for testing and all the remaining cases for training. This is applied iteratively for all cases available. In our setting, each case in the generated dataset corresponds to one combination of one of the 107 original classification datasets, one of the 5 learning algorithms and one of the 9 target variable metrics. This means we carried out a total of 4815 experiments for each one of the three METALLIC algorithms proposed. ($107 \times 5 \times 9 = 4815$).
+
+
+
+\section{Experimental Results and Discussion}\label{sec:results}
+The main goal of this section is display and discuss the results of the experimental evaluation carried out to obtain insights on the efficiency of the three proposed methods. We compared the three METALLIC solutions (using the nearest neighbor, regression and deep learning approaches) in Section~\autoref{sec:res1}. Then, we compare the more detailed results obtained for each one of the 5 different learners in Section~\autoref{sec:res2}. Section~\autoref{sec:res3} describes the implemented user interface. In Section~\autoref{sec:res4} we provide an application example of METALLIC displaying a specific use case of our Algorithm and recommendation system. Finally, Section~\autoref{sec:res5} summarizes the overall conclusions of the experimental results. 
+
+For reproducibility purposes, all the code and data used for our experiments is freely provided at \url{https://github.com/sai-akhil/Metallic}.
+
+
+\subsection{Comparing the Proposed METALLIC Variants}\label{sec:res1}
+After applying the previously described experimental setting, we compared the results obtained in all the three variants proposed.
+\autoref{tab:metallic_wins} shows the overall results obtained for the different performance assessment metrics evaluated (Kappa, Krippendorff and Prec@5). We used `NN',`RG' and `DL' to represent the METALLIC variants using nearest neighbor, regression, and deep learning, respectively. This table displays the overall total number of wins of each method when compared against the other alternatives and ties. This analysis was carried out for each performance metric that the end-user may select for his task. We consider that a method wins when he achieves a score higher than the other methods for the metric considered. When conducting recommendations for all potential metrics targeted by the end-user (F1, G-Mean, etc.), we find a clear advantage of employing the regression approach of METALLIC.\@ This is observed for all the used agreement metrics (Kappa, Krippendorff's alpha and Prec@5) exhibiting more wins irrespectively of the performance metric targeted by the end-user. We also observe that for Balanced Accuracy and CWA metrics, the regression alternative of METALLIC is still the best one but the number of wins is less overwhelming. For these two metrics the regression alternative still is the best overall option with more wins. However, both the nearest neighbor and deep learning alternatives show a higher number of wins.   
+
+To complement our analysis we also observed the results of all the agreement performance metrics considered (Kappa, Krippendorff's alpha, and Precision@5) to assess if how well the different alternatives predict the multiple end-user target metrics. Table~\autoref{tab:meanscores} shows the average scores and standard deviation for the three METALLIC variants (regression, nearest neighbor and deep learning).
+These results confirm that the regression variant has the highest Kappa, Krippendorff's alpha and Precision@5 scores when compared against the other variants for all the different metrics that the end-user can consider. Moreover, we also observe that the Kappa scores are overall lower across all METALLIC variants. However, both Krippendorff's alpha and Precision@5 scores are higher, specially for the regression alternative, indicating a good agreement between the predicted ranks and the true ranks of the 20 resampling strategies considered. We also observe that the MSE for our regression variant is lower on average for all predicted metrics when compared against the deep learning alternative. Moreover, the standard deviation is also lower for the regression model. The METALLIC variant using nearest neighbors is not evaluated for MSE as in this case only the rankings are outputted and no numeric score is obtained for the different metrics.  
+
+
+
+\begin{sidewaystable}[htbp]
+\centering
+\captionsetup{justification=centering}
+\caption{Number of wins for METALLIC variants evaluated on Kappa score, Krippendorff's alpha, and precision@5.\\\small{Note: RG = Regression, NN = Nearest Neighbor, DL = Deep Learning}}\label{tab:metallic_wins}
+\begin{tabular}{lcccccccccccc}
+\toprule
+\multirow{1}{*}{\textbf{Metric}} & \multicolumn{4}{c}{\textbf{Kappa}} & \multicolumn{4}{c}{\textbf{Krippendorff's alpha}} & \multicolumn{4}{c}{\textbf{Precision@5}} \\
+%\cline{2-13}
+ & RG & NN & DL & Tie & RG & NN & DL & Tie & RG & NN & DL & Tie \\
+\midrule
+F1 & 429 & 46 & 50 & 0 & 434 & 64 & 27 & 0 & 399 & 104 & 13 & 9 \\
+G-mean & 398 & 64 & 60 & 3 & 426 & 85 & 14 & 0 & 361 & 130 & 19 & 15 \\
+Accuracy & 470 & 30 & 24 & 1 & 466 & 50 & 9 & 0 & 383 & 102 & 25 & 15 \\
+Precision & 424 & 54 & 47 & 0 & 436 & 70 & 19 & 0 & 411 & 85 & 14 & 15 \\
+Recall & 432 & 45 & 48 & 0 & 432 & 59 & 34 & 0 & 375 & 105 & 26 & 19 \\
+ROCAUC & 427 & 49 & 49 & 0 & 402 & 74 & 49 & 0 & 387 & 101 & 22 & 15 \\
+PRAUC & 397 & 68 & 60 & 0 & 380 & 83 & 62 & 0 & 378 & 105 & 22 & 20 \\
+BalAcc & 298 & 125 & 94 & 8 & 277 & 120 & 128 & 0 & 257 & 141 & 96 & 31 \\
+CWA & 293 & 125 & 96 & 11 & 256 & 135 & 134 & 0 & 238 & 154 & 106 & 27 \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}
+
+
+
+\begin{sidewaystable}[htbp]
+\centering
+\caption{Average and standard deviation of performance scores for METALLIC variants}\label{tab:meanscores}
+\small
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{F1} & \textbf{G-Mean} & \textbf{Acc} & \textbf{Precision} & \textbf{Recall} & \textbf{ROCAUC} & \textbf{PRAUC} & \textbf{BalAcc} & \textbf{CWA} \\
+\midrule
+\multicolumn{10}{c}{\textbf{METALLIC \textendash{} RG Variant}} \\
+\midrule
+Kappa   & 0.213(0.119) & 0.168(0.118) & 0.240(0.118) & 0.222(0.119) & 0.178(0.112) & 0.212(0.122) & 0.187(0.115) & 0.083(0.110) & 0.078(0.105) \\ 
+Kripp   & 0.763(0.217) & 0.723(0.212) & 0.800(0.174) & 0.749(0.224) & 0.648(0.247) & 0.670(0.268) & 0.655(0.280) & 0.234(0.474) & 0.258(0.485) \\ 
+Prec@5  & 0.654(0.260) & 0.623(0.242) & 0.636(0.253) & 0.626(0.245) & 0.559(0.294) & 0.653(0.231) & 0.622(0.226) & 0.371(0.279) & 0.346(0.270) \\
+MSE     & 0.031(0.045) & 0.039(0.048) & 0.012(0.017) & 0.017(0.025) & 0.012(0.019) & 0.010(0.022) & 0.014(0.031) & 0.032(0.065) & 0.032(0.061) \\
+\midrule
+\multicolumn{10}{c}{\textbf{METALLIC \textendash{} NN Variant}}\\
+\midrule
+Kappa   & 0.046(0.088) & 0.033(0.079) & 0.033(0.075) & 0.047(0.094) & 0.019(0.068) & 0.030(0.079) & 0.041(0.096) & 0.069(0.238) & 0.068(0.238) \\
+Kripp   & 0.442(0.353) & 0.099(0.308) & 0.440(0.290) & 0.399(0.357) & 0.242(0.334) & 0.392(0.288) & 0.335(0.349) & 0.162(0.352) & 0.204(0.405) \\ 
+Prec@5  & 0.477(0.291) & 0.492(0.279) & 0.464(0.257) & 0.431(0.256) & 0.371(0.264) & 0.467(0.248) & 0.434(0.250) & 0.373(0.295) & 0.368(0.295) \\
+MSE     & \textendash{} & \textendash{} & \textendash{} & \textendash{} & \textendash{} & \textendash{} & \textendash{} & \textendash{} & \textendash{} \\
+\midrule
+\multicolumn{10}{c}{\textbf{METALLIC \textendash{} DNN Variant}}\\
+\midrule
+Kappa   & 0.066(0.092) & 0.045(0.077) & 0.072(0.094) & 0.070(0.088) & 0.064(0.090) & 0.071(0.123) & 0.070(0.121) & 0.039(0.114) & 0.040(0.116) \\
+Kripp   & 0.113(0.345) & 0.099(0.308) & 0.105(0.337) & 0.095(0.362) & 0.079(0.343) & 0.109(0.355) & 0.110(0.372) & 0.060(0.333) & 0.080(0.342) \\
+Prec@5  & 0.236(0.177) & 0.242(0.194) & 0.233(0.183) & 0.237(0.188) & 0.230(0.177) & 0.290(0.241) & 0.290(0.231) & 0.248(0.205) & 0.262(0.213) \\
+MSE     & 0.051(0.081) & 0.016(0.022) & 0.020(0.032) & 0.042(0.062) & 0.044(0.088) & 0.084(0.014) & 0.037(0.059) & 0.058(0.086) & 0.014(0.017) \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}
+
+\subsection{Comparing the Recommendations Obtained for Different Base Classifiers}\label{sec:res2}
+
+% We also explore the results of the three METALLIC alternatives individually for each considered learning algorithm. 
+
+In the previous section we established that, overall, the best METALLIC variant is the regression variant (cf.~\autoref{alg:metallic_regression} defined in Section~\autoref{subsec:algs}). We now focus on analysing the impact of the user selected learning algorithm that is applied after each resampling strategy. Our goal is to determine if the METALLIC Algorithm shows a better (or worst) performance when providing recommendations for a particular learner selected by the end-user. To this end, we observe the mean and standard deviation of the target metric (F1, G-Mean, Accuracy precision, recall, ROCAUC, PRAUC, BalAcc and CWA) for each one of the five tested learning algorithms. We analyse these results for all the three METALLIC variants to observe if there are some particular learners that are biasing the overall results. Tables~\autoref{tab:regression_scores}, \autoref{tab:nn_scores} and \autoref{tab:deep_scores} show the mean and standard deviation results for all five learning algorithms for the regression, nearest neighbor and deep learning variants of METALLIC, respectively. %Table \autoref{tab:deep_scores} to Table \autoref{tab:deep_scores} shows the average mean and standard deviation scores for the deep learning metalearner for all five learning algorithms. 
+
+
+
+\begin{sidewaystable}[!htbp]
+\caption{Average and standard deviation of the target evaluation metrics (F1, G-Mean, Accuracy, Precision, Recall, ROCAUC, PRAUC, BalAcc and CWA) for each of the tested learners using the regression variant of METALLIC (cf.~\autoref{alg:metallic_regression}).}\label{tab:regression_scores}
+
+\centering
+\small
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{F1} & \textbf{G-Mean} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{ROCAUC} & \textbf{PRAUC} & \textbf{BalAcc} & \textbf{CWA} \\
+\midrule
+\multicolumn{10}{c}{\textbf{Decision Tree}}\\
+\midrule
+\textbf{Kappa} & 0.217(0.120) & 0.174(0.112) & 0.213(0.108) & 0.204(0.109) & 0.166(0.101) & 0.196(0.099) & 0.180(0.116) & 0.091(0.111) & 0.094(0.105) \\
+\textbf{Kripp.} & 0.761(0.211) & 0.720(0.206) & 0.787(0.165) & 0.725(0.249) & 0.606(0.256) & 0.677(0.242) & 0.642(0.284) & 0.239(0.476) & 0.288(0.478) \\
+\textbf{Prec@5} & 0.651(0.243) & 0.615(0.243) & 0.606(0.216) & 0.594(0.231) & 0.573(0.272) & 0.663(0.224) & 0.600(0.217) & 0.364(0.281) & 0.337(0.266) \\
+\textbf{MSE} & 0.023(0.034) & 0.034(0.046) & 0.011(0.016) & 0.012(0.016) & 0.008(0.012) & 0.008(0.013) & 0.013(0.029) & 0.027(0.056) & 0.027(0.053) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Gaussian Naive Bayes}}\\
+\midrule
+\textbf{Kappa} & 0.205(0.107) & 0.149(0.105) & 0.204(0.114) & 0.216(0.112) & 0.171(0.105) & 0.209(0.120) & 0.172(0.106) & 0.094(0.125) & 0.079(0.114) \\
+\textbf{Kripp.} & 0.717(0.207) & 0.679(0.180) & 0.699(0.214) & 0.693(0.250) & 0.651(0.224) & 0.627(0.284) & 0.616(0.289) & 0.255(0.495) & 0.268(0.514) \\
+\textbf{Prec@5} & 0.564(0.245) & 0.570(0.214) & 0.560(0.267) & 0.554(0.239) & 0.503(0.270) & 0.661(0.204) & 0.589(0.235) & 0.389(0.288) & 0.368(0.256) \\
+\textbf{MSE} & 0.034(0.040) & 0.045(0.046) & 0.020(0.026) & 0.021(0.030) & 0.020(0.029) & 0.007(0.012) & 0.013(0.029) & 0.030(0.057) & 0.031(0.055) \\
+\midrule
+\multicolumn{10}{c}{\textbf{KNN}}\\
+\midrule
+\textbf{Kappa} & 0.254(0.122) & 0.220(0.124) & 0.280(0.122) & 0.254(0.126) & 0.186(0.123) & 0.242(0.139) & 0.214(0.132) & 0.076(0.104) & 0.073(0.099) \\
+\textbf{Kripp.} & 0.837(0.192) & 0.807(0.216) & 0.881(0.100) & 0.827(0.169) & 0.688(0.241) & 0.718(0.279) & 0.711(0.269) & 0.202(0.466) & 0.222(0.481) \\
+\textbf{Prec@5} & 0.766(0.247) & 0.739(0.244) & 0.699(0.268) & 0.707(0.242) & 0.615(0.300) & 0.688(0.237) & 0.678(0.226) & 0.360(0.262) & 0.343(0.264) \\
+\textbf{MSE} & 0.024(0.042) & 0.026(0.033) & 0.008(0.010) & 0.011(0.016) & 0.010(0.015) & 0.007(0.010) & 0.011(0.023) & 0.031(0.066) & 0.031(0.062) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Random Forest}}\\
+\midrule
+\textbf{Kappa} & 0.232(0.117) & 0.186(0.113) & 0.256(0.117) & 0.228(0.124) & 0.199(0.113) & 0.232(0.127) & 0.192(0.108) & 0.086(0.118) & 0.083(0.111) \\
+\textbf{Kripp.} & 0.790(0.204) & 0.768(0.176) & 0.815(0.166) & 0.782(0.178) & 0.645(0.247) & 0.698(0.271) & 0.693(0.252) & 0.240(0.498) & 0.278(0.498) \\
+\textbf{Prec@5} & 0.686(0.254) & 0.646(0.222) & 0.678(0.226) & 0.657(0.228) & 0.570(0.328) & 0.686(0.202) & 0.650(0.207) & 0.373(0.304) & 0.349(0.282) \\
+\textbf{MSE} & 0.022(0.035) & 0.037(0.054) & 0.008(0.011) & 0.013(0.023) & 0.008(0.011) & 0.007(0.015) & 0.012(0.029) & 0.029(0.063) & 0.029(0.061) \\
+\midrule
+\multicolumn{10}{c}{\textbf{SVM}}\\
+\midrule
+\textbf{Kappa} & 0.155(0.109) & 0.110(0.107) & 0.244(0.114) & 0.208(0.119) & 0.171(0.117) & 0.181(0.115) & 0.175(0.107) & 0.069(0.091) & 0.061(0.091) \\
+\textbf{Kripp.} & 0.712(0.246) & 0.640(0.238) & 0.815(0.156) & 0.717(0.238) & 0.651(0.262) & 0.628(0.254) & 0.611(0.296) & 0.236(0.442) & 0.232(0.459) \\
+\textbf{Prec@5} & 0.604(0.269) & 0.547(0.242) & 0.636(0.264) & 0.617(0.257) & 0.535(0.288) & 0.566(0.265) & 0.592(0.234) & 0.370(0.261) & 0.333(0.286) \\
+\textbf{MSE} & 0.051(0.063) & 0.052(0.056) & 0.013(0.013) & 0.026(0.034) & 0.013(0.022) & 0.020(0.040) & 0.022(0.041) & 0.042(0.081) & 0.041(0.071) \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}
+
+
+
+We begin by analysing the results of the regression METALLIC variant in Table~\autoref{tab:regression_scores}. In this case, the classifier for which we obtain the best overall ranking results is the K Nearest Neighbor (KNN) while the worst one is the Gaussian Naive Bayes. We must also highlight that the tendency previously observed on the Balanced Accuracy and CWA metrics is general to all the learners when using the regression variant of METALLIC.\@ This shows that this solution will provide good ranking results for the resampling strategies when the end-user is interested in any metric and when using any learning algorithm, except for the Balanced Accuracy and CWA metrics where the performance will not be as reliable. Although some fluctuation is present between the results of the different learning algorithms, we did not find a case where a particular metric was exhibiting a strong divergence from the other learners' values. This confirms that an end-user can safely use the regression METALLIC Algorithm for obtaining the top most effective resampling strategies for any of the 5 base learners we included in our study.
+
+
+Regarding the results of the nearest neighbor variant of METALLIC, shown in Table~\autoref{tab:nn_scores}, we observe that overall these results are lower than the ones obtained with the regression variant of METALLIC.\@ Still, we note that the results are consistently below 0.5 for both Krippendorff's alpha and Precision@5 which is in effect much lower than the results observed for the regression variant. The exception for this variant is the KNN learner which achieves higher results on these two metrics for the F1 score, G-Mean, Accuracy and Precision. The results of KNN on the remaining metrics is lower although for the Recall, ROCAUC and PRAUC they are between 0.4 and 0.5.\@
+
+
+\begin{sidewaystable}[!htbp]
+\caption{Average and standard deviation of the target evaluation metrics (F1, G-Mean, Accuracy, Precision, Recall, ROCAUC, PRAUC, BalAcc and CWA) for each of the tested learners using the nearest neighbor variant of METALLIC (cf.~\autoref{alg:metallic_nearest_neighbors}).}\label{tab:nn_scores}
+\centering
+\small
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{F1} & \textbf{G-Mean} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{ROCAUC} & \textbf{PRAUC} & \textbf{BalAcc} & \textbf{CWA} \\
+\midrule
+\multicolumn{10}{c}{\textbf{Decision Tree}}\\
+\midrule
+\textbf{Kappa} & 0.049(0.095) & 0.029(0.077) & 0.023(0.069) & 0.036(0.083) & 0.023(0.073) & 0.028(0.076) & 0.033(0.104) & 0.079(0.237) & 0.068(0.238) \\
+\textbf{Kripp.} & 0.429(0.343) & 0.426(0.295) & 0.403(0.287) & 0.348(0.372) & 0.209(0.345) & 0.351(0.287) & 0.320(0.352) & 0.168(0.349) & 0.212(0.404) \\
+\textbf{Prec@5} & 0.461(0.278) & 0.480(0.260) & 0.436(0.211) & 0.396(0.232) & 0.375(0.249) & 0.480(0.260) & 0.440(0.247) & 0.379(0.306) & 0.366(0.306) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Gaussian Naive Bayes}}\\
+\midrule
+\textbf{Kappa} & 0.043(0.083) & 0.013(0.061) & 0.023(0.073) & 0.051(0.099) & 0.009(0.058) & 0.023(0.075) & 0.024(0.086) & 0.065(0.240) & 0.070(0.238) \\
+\textbf{Kripp.} & 0.387(0.315) & 0.310(0.259) & 0.347(0.284) & 0.324(0.372) & 0.233(0.287) & 0.338(0.287) & 0.271(0.356) & 0.186(0.346) & 0.236(0.380) \\
+\textbf{Prec@5} & 0.413(0.234) & 0.383(0.219) & 0.408(0.284) & 0.364(0.232) & 0.333(0.221) & 0.444(0.208) & 0.371(0.221) & 0.366(0.306) & 0.387(0.290) \\
+\midrule
+\multicolumn{10}{c}{\textbf{KNN}}\\
+\midrule
+\textbf{Kappa} & 0.067(0.093) & 0.066(0.101) & 0.066(0.087) & 0.066(0.108) & 0.034(0.082) & 0.038(0.091) & 0.053(0.106) & 0.064(0.238) & 0.064(0.238) \\
+\textbf{Kripp.} & 0.553(0.338) & 0.624(0.221) & 0.591(0.279) & 0.519(0.298) & 0.334(0.372) & 0.496(0.266) & 0.421(0.321) & 0.140(0.363) & 0.194(0.414) \\
+\textbf{Prec@5} & 0.589(0.318) & 0.636(0.287) & 0.568(0.283) & 0.503(0.275) & 0.415(0.274) & 0.514(0.280) & 0.476(0.281) & 0.362(0.282) & 0.354(0.298) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Random Forest}}\\
+\midrule
+\textbf{Kappa} & 0.041(0.089) & 0.029(0.067) & 0.031(0.079) & 0.041(0.092) & 0.015(0.067) & 0.033(0.083) & 0.059(0.093) & 0.059(0.240) & 0.078(0.238) \\
+\textbf{Kripp.} & 0.438(0.376) & 0.478(0.311) & 0.428(0.300) & 0.436(0.340) & 0.226(0.327) & 0.410(0.318) & 0.384(0.334) & 0.164(0.345) & 0.219(0.416) \\
+\textbf{Prec@5} & 0.470(0.297) & 0.491(0.292) & 0.436(0.251) & 0.455(0.259) & 0.375(0.289) & 0.493(0.235) & 0.493(0.234) & 0.370(0.292) & 0.377(0.298) \\
+\midrule
+\multicolumn{10}{c}{\textbf{SVM}}\\
+\midrule
+\textbf{Kappa} & 0.030(0.079) & 0.030(0.076) & 0.022(0.054) & 0.044(0.083) & 0.013(0.058) & 0.027(0.071) & 0.037(0.083) & 0.078(0.238) & 0.062(0.240) \\
+\textbf{Kripp.} & 0.402(0.372) & 0.469(0.292) & 0.429(0.243) & 0.368(0.367) & 0.210(0.323) & 0.368(0.253) & 0.280(0.364) & 0.155(0.360) & 0.158(0.415) \\
+\textbf{Prec@5} & 0.451(0.295) & 0.469(0.274) & 0.472(0.262) & 0.436(0.260) & 0.358(0.278) & 0.404(0.239) & 0.389(0.243) & 0.390(0.295) & 0.358(0.290) \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}
+
+Finally, we observe that the results obtained on the deep learning variant of METALLIC, as displayed in Table~\autoref{tab:deep_scores}, are not satisfactory, being consistently below 0.3 for all the different learners. It is surprising that the deep learning model was not able to perform well in this task. We will consider studying the use of different architectures to address this problem in the future. We believe that this is the main factor responsible for such a poor performance. We must note however, that we carried out some preliminary tests with other simpler architectures with a smaller number of layers but the results were equally unsatisfactory. As in the previous variants results there is no particular learner that the end-user can select whose results will differ significantly form the other learners.
+
+When comparing the three METALLIC variants we observe that the averaged scores of Kappa, Krippendorff's alpha and Precision@5 of the regression variant are higher than it's two counterparts while the opposite is observed for MSE.\@ This shows that this is the best approach to use providing results that are in agreement with the ground truth. Thus this is the variant we select as the best one to provide recommendations to an end-user regarding the best set of resampling strategies to try for a given predictive task.
+
+
+% From these regression metalearner tables, we observe that  Krippendorff score shows best results when compared to kappa and precision@5. Accuracy had the best outcomes of all the user-selected metrics, indicating that this metric might give false findings in the case of unbalanced domains. Overall, precision and recall have pretty equal ratings. We can also observe that the scores for Balanced accuracy are low for all the learners and the scores for ROC-AUC, PR-AUC and CWA are highest for KNN as previously mentioned. KNN's performance scores are much higher than the other base learners and the metalearner counterparts. This further improves the confidence of choosing the regression metalearner. 
+
+
+
+\begin{sidewaystable}[!htbp]
+\caption{Average and standard deviation of the target evaluation metrics (F1, G-Mean, Accuracy, Precision, Recall, ROCAUC, PRAUC, BalAcc and CWA) for each of the tested learners using the deep learning variant of METALLIC (cf.~\autoref{alg:metallic_deep}).}\label{tab:deep_scores}
+
+\centering
+\small
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{F1} & \textbf{G-Mean} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{ROCAUC} & \textbf{PRAUC} & \textbf{BalAcc} & \textbf{CWA} \\
+\midrule
+\multicolumn{10}{c}{\textbf{Decision Tree}}\\
+\midrule
+\textbf{Kappa} & 0.061(0.088) & 0.046(0.072) & 0.077(0.091) & 0.054(0.077) & 0.070(0.095) & 0.069(0.094) & 0.081(0.132) & 0.044(0.124) & 0.057(0.133) \\
+\textbf{Kripp.} & 0.094(0.336) & 0.094(0.305) & 0.128(0.337) & 0.049(0.361) & 0.111(0.324) & 0.145(0.343) & 0.154(0.362) & 0.025(0.340) & 0.151(0.343) \\
+\textbf{Prec@5} & 0.236(0.175) & 0.291(0.211) & 0.223(0.185) & 0.211(0.175) & 0.227(0.164) & 0.295(0.232) & 0.293(0.239) & 0.242(0.197) & 0.297(0.232) \\
+\textbf{MSE} & 0.067(0.069) & 0.092(0.095) & 0.081(0.083) & 0.080(0.082) & 0.019(0.019) & 0.030(0.031) & 0.012(0.013) & 0.057(0.059) & 0.011(0.013) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Gaussian Naive Bayes}}\\
+\midrule
+\textbf{Kappa} & 0.065(0.096) & 0.052(0.070) & 0.062(0.090) & 0.084(0.088) & 0.059(0.085) & 0.057(0.091) & 0.081(0.158) & 0.049(0.140) & 0.035(0.088) \\
+\textbf{Kripp.} & 0.086(0.358) & 0.105(0.305) & 0.113(0.331) & 0.166(0.352) & 0.061(0.342) & 0.086(0.337) & 0.139(0.383) & 0.090(0.365) & 0.090(0.325) \\
+\textbf{Prec@5} & 0.223(0.172) & 0.204(0.184) & 0.255(0.193) & 0.257(0.198) & 0.219(0.183) & 0.267(0.225) & 0.301(0.247) & 0.255(0.212) & 0.253(0.195) \\
+\textbf{MSE} & 0.053(0.055) & 0.021(0.022) & 0.063(0.064) & 0.028(0.029) & 0.055(0.056) & 0.017(0.019) & 0.083(0.085) & 0.017(0.018) & 0.012(0.013) \\
+\midrule
+\multicolumn{10}{c}{\textbf{KNN}}\\
+\midrule
+\textbf{Kappa} & 0.091(0.092) & 0.040(0.084) & 0.040(0.093) & 0.062(0.085) & 0.063(0.092) & 0.082(0.156) & 0.070(0.126) & 0.048(0.117) & 0.040(0.120) \\
+\textbf{Kripp.} & 0.174(0.338) & 0.073(0.326) & 0.059(0.343) & 0.088(0.349) & 0.086(0.346) & 0.128(0.372) & 0.116(0.392) & 0.072(0.322) & 0.056(0.363) \\
+\textbf{Prec@5} & 0.238(0.178) & 0.234(0.179) & 0.200(0.173) & 0.223(0.176) & 0.250(0.184) & 0.307(0.259) & 0.316(0.238) & 0.251(0.217) & 0.250(0.207) \\
+\textbf{MSE} & 0.018(0.019) & 0.037(0.046) & 0.020(0.028) & 0.027(0.028) & 0.058(0.059) & 0.032(0.033) & 0.055(0.057) & 0.057(0.058) & 0.029(0.030) \\
+\midrule
+\multicolumn{10}{c}{\textbf{Random Forest}}\\
+\midrule
+\textbf{Kappa} & 0.042(0.089) & 0.031(0.066) & 0.080(0.098) & 0.066(0.088) & 0.075(0.098) & 0.071(0.098) & 0.059(0.080) & 0.029(0.103) & 0.032(0.123) \\
+\textbf{Kripp.} & 0.090(0.329) & 0.139(0.281) & 0.126(0.325) & 0.084(0.378) & 0.125(0.350) & 0.123(0.359) & 0.093(0.364) & 0.088(0.309) & 0.037(0.318) \\
+\textbf{Prec@5} & 0.246(0.191) & 0.250(0.209) & 0.261(0.180) & 0.253(0.202) & 0.246(0.178) & 0.307(0.250) & 0.269(0.196) & 0.257(0.216) & 0.265(0.228) \\
+\textbf{MSE} & 0.015(0.017) & 0.034(0.035) & 0.012(0.014) & 0.064(0.065) & 0.030(0.032) & 0.025(0.026) & 0.013(0.015) & 0.031(0.032) & 0.052(0.053) \\
+\midrule
+\multicolumn{10}{c}{\textbf{SVM}}\\
+\midrule
+\textbf{Kappa} & 0.070(0.092) & 0.057(0.088) & 0.071(0.100) & 0.083(0.098) & 0.051(0.079) & 0.076(0.159) & 0.059(0.090) & 0.028(0.076) & 0.036(0.110) \\
+\textbf{Kripp.} & 0.122(0.361) & 0.082(0.324) & 0.100(0.350) & 0.091(0.366) & 0.011(0.347) & 0.061(0.362) & 0.048(0.354) & 0.023(0.325) & 0.069(0.357) \\
+\textbf{Prec@5} & 0.238(0.174) & 0.232(0.178) & 0.225(0.181) & 0.238(0.186) & 0.210(0.174) & 0.272(0.237) & 0.272(0.234) & 0.232(0.184) & 0.248(0.199) \\
+\textbf{MSE} & 0.081(0.083) & 0.031(0.026) & 0.031(0.032) & 0.016(0.019) & 0.024(0.025) & 0.010(0.011) & 0.096(0.099) & 0.021(0.021) & 0.014(0.015) \\
+\bottomrule
+\end{tabular}
+\end{sidewaystable}
+
+
+
+
+\subsection{A User Interface to Interact with METALLIC Solution}\label{sec:res3}
+
+We recognize that one of the most relevant goals of our proposed METALLIC Algorithm is to aid end-users in the complex task of selecting which resampling techniques to try for a given problem. The process of selecting the most suitable resampling strategies to apply can be tedious, time consuming and resource-intensive. For this reason, we decided to not only to implement and experimentally validate a suitable solution for the problem of selecting the top K best resampling strategies, but we also make our solution available through an easy to use online web application. This way, any researcher or end-user, with more or less computer science background knowledge, is able to obtain the top ranked resampling strategies for his particular problem without any extra work besides opening a web browser and uploading a standard csv file. This is another relevant contribution of this paper that we describe next.
+
+
+We created a web application wrapping our designed recommendation system which is accessible at the following link \url{https://metallic.pythonanywhere.com/}. This web application, is freely available to any interested user. Our web application allows the end-user to easily upload a dataset file in a ``.csv' format and choose a desired base classifier and performance metric in order to obtain the best resampling strategies, as calculated by the regression variant of the METALLIC Algorithm. 
+
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=0.8\textwidth]{webpage.png}
+    \caption{Web Application for METALLIC}\label{fig:webpage}
+\end{figure}
+
+
+An example of the interface and expected output of this web application are shown in Figure~\autoref{fig:webpage}. In this example, the end-user has uploaded the diabetes.csv file and chose the F1 metric and the SVM classifier. This means that the recommendations obtained will be valid for this dataset assuming the end-user is interested in applying an SVM learner and is interested in obtaining the best F1-score. For the same dataset, if the end-user changes the metric, the results of the top resampling strategies can also change. The recommendation provided by the web application are displayed after clicking the ``Process' button. We observe that in this case the system recommended the use of:
+\begin{enumerate}
+    \item Borderline Smote
+    \item Neighbourhood Cleaning Rule
+    \item Condensed Nearest Neighbour
+\end{enumerate}
+We verify that the system can provide a mixture of both oversampling and undersampling solutions. The recommendations are focused on maximizing the expected performance irrespectively of the type of strategy that can be applied.
+
+Overall, our web application aims at making it easier for any researcher or user to decide which resampling strategies are more likely to provide advantages when dealing with the class imbalance problem. The user does not need to know Python or any other programming language to obtain the desired rankings of the strategies. This web application allows to avoid tasks such as finding the source code to run, go through some readme files to understand what scripts are necessary, or even installing required packages. The web application is simple and easy to use, making the task of selecting resampling strategies quick and practical to the end-user.  
+
+
+\subsection{An Illustrative Use Case of METALLIC}\label{sec:res4}
+In this section our goal is to provide an example of the recommendation system we developed in a particular dataset. We will focus on the METALLIC Algorithm using the regression variant and will show how the obtained predictions of the scores of the different metrics compare against the true metrics' scores. All our code and data is freely available on Github in the following link: \url{https://github.com/sai-akhil/Metallic}. For this case study we considered the dataset ``ecoli1'\footnote{Available at: \url{https://github.com/sai-akhil/Metallic/blob/main/Dataset/ecoli1.csv}. Original source: KEEL repository at \url{https://sci2s.ugr.es/keel/imbalanced.php}} as the dataset for which we want to obtain a recommendation of the best resampling strategies to apply. We assume we are interested in using the Random Forest algorithm.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{f1_roc.png}
+\caption{F1 Scores (left) and ROCAUC Scores (right) for Random Forest on ecoli1 Dataset.}\label{f1}
+\end{figure}
+
+% \begin{figure}[!htbp]
+% \centering
+% \includegraphics[width=0.8\textwidth]{f1.png}
+% \caption{F1 scores for Random Forest on ecoli1 Dataset}
+% \label{f1}
+% \end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{gmean_prec.png}
+\caption{G-Mean Scores (left) and Precision Scores (right) for Random Forest on ecoli1 Dataset.}\label{gmean}
+\end{figure}
+
+
+% \begin{figure}[!htbp]
+% \includegraphics[width=0.8\textwidth]{prec.png}
+% \centering
+% \caption{Precision Scores for Random Forest on ecoli1 Dataset}
+% \label{pred}
+% \end{figure}
+
+% \begin{figure}[!htp]
+% \includegraphics[width=0.8\textwidth]{roc.png}
+% \centering
+% \caption{ROCAUC Scores for Random Forest on ecoli1 Dataset}
+% \label{roc}
+% \end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Figure~\autoref{f1} to Figure~\autoref{cwa} show the true and predicted scores with respect to the various resampling techniques tested for different performance metrics when selecting the Random Forest classifier for the ``ecoli1" dataset. Overall, we observe that there are some differences between the true and predicted scores for all performance metrics. However, we can also confirm that the predicted scores are close to the actual scores showing that our METALLIC solution is able to reasonably approximate the scores of the different performance metrics for the multiple resampling techniques.
+
+
+In this particular dataset, we observe from Figures~\autoref{f1} and \autoref{gmean}, that there is a small distance between the true and predicted score for F1, ROCAUC and precision metrics. This distance is higher for the G-Mean metric in this case. Given that we observed an overall lower performance tendency on Balanced Accuracy and CWA, we decided to also inspect these two metrics results. Figure~\autoref{cwa} shows the results of these two metrics for the ``ecoli1" dataset when using the Random Forest classifier. The Balanced Accuracy results are very close to the true scores. However, we notice a higher discrepancies for the CWA. We must highlight that the scale used is also relevant, as the difference between the true values and predicted values is not high. However, the inconsistency between the higher actual scores and the higher predicted scores leads to a different recommendation set in this case. 
+These detailed results are thus consistent with what we observed in the overall analysis.
+
+% We have shown plots that depict the performance of the regression metalearner that we chose with respect to the various resampling strategies and evaluation metrics. 
+% We also observe that the regression learner predicts best when BalancedAccuracy or Accuracy metrics are selected and performs worst when G-mean metric is selected. This can be seen from Figure \autoref{f1} to Figure \autoref{cwa}. 
+
+% For this study, to better understand how the model works, we concentrate only on one of the plots and we selected the 'F1' metric and the 'Random Forest' learner. This implies we want to get a suggestion for the resampling methods to utilise, knowing that we'll use the F1 metric as a performance indicator and create a random forest model. We train METALLIC on all datasets except 'ecoli1' to generate a model for the appropriate goal measure and learner after removing the relevant metafeatures from our 'ecoli1' data. The generated model is then used to produce predictions for the 'ecoli1' dataset. We chose the three best resampling algorithms to output, and the results are as follows. First place: SMOTEENN, second place: SVMSMOTE, and third place: SMOTETomek. Our model also allows to obtain more recommendations as required. To validate our results we observe the ranking of the best resampling techniques for the dataset under consideration, i.e., the ground truth. Figure~\autoref{f1} shows the true and predicted results for the scenario that we have considered. We display on the X-axis all the resampling techniques tested. We also observe that there is no drastic difference between the actual true scores and the predicted scores obtained with METALLIC which shows that our model is working well. 
+
+% \begin{figure}[!hbt]
+% \includegraphics[width=0.8\textwidth]{accuracy.png}
+% \centering
+% \caption{Accuracy Scores for Random Forest on ecoli1 Dataset}
+% \label{acc}
+% \end{figure}
+
+
+% \begin{figure}[!hbtp]
+% \includegraphics[width=0.8\textwidth]{balacc.png}
+% \centering
+% \caption{Balanced Accuracy Scores for Random Forest on ecoli1 Dataset}
+% \label{bal}
+% \end{figure}
+
+% \begin{figure}[!hbtp]
+% \includegraphics[width=0.8\textwidth]{cwa.png}
+% \centering
+% \caption{CWA Scores for Random Forest on ecoli1 Dataset}
+% \label{cwa}
+% \end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\textwidth]{BallAcc_CWA.png}
+    \caption{Balanced Accuracy Scores (left) and CWA Scores (right) for Random Forest on ecoli1 Dataset.}\label{cwa}
+\end{figure}
+
+\subsection{Results Summary}\label{sec:res5}
+
+The experimental evaluation conducted shows that our METALLIC solution with the regression variant is the most successful at predicting the resampling approaches that will lead to higher performance for the given dataset, metric and learning algorithm. Our approach is applicable to both binary and multiclass datasets. The following are the main conclusions drawn from the experiments described in this section:
+
+\begin{itemize}
+    \item METALLIC variant suing a regression learner provides the best overall performance;
+    \item the recommendation results obtained show a good match with the true best performing resampling strategies;
+    \item overall the results are good for all the metrics, but there is a decrease in the performance for theBalanced Accuracy and CWA metrics;
+    \item we did not find any bias in the results obtained for the different learners, which means that we are able to achieve good recommendation across the five learning algorithms tried;
+    \item we present an easy-to-use web application that provides resampling strategies recommendations for any dataset that the end-user uploads, and any metric and learner selected.
+\end{itemize}
+
+% The following are the primary benefits of utilising this method: One, it provides the most accurate results, and two, it takes very little time to process and recommend. One of the primary disadvantages of this model is that in order to achieve the best results, we must train it using a variety of datasets. The larger and more diversified the training set, the better.
+
+
+\section{Conclusion and Future Work}\label{sec:conclusion}
+Imbalanced datasets present numerous challenges to traditional machine learning approaches. The use of resampling techniques in order to correct the observed distribution skew is a prevalent and well-researched area of the literature, for which multiple algorithms have been proposed. These strategies have become broadly used due to their relative simplicity and effectiveness. However, the limited development of autonomous methods for the selection of these resampling strategies, implies that the burden of testing the effectiveness of these methods, a tedious, time-consuming and resource-intensive task, is left to the end-user. 
+
+In this work, we presented METALLIC, a novel meta-learning-based algorithm that automates the task of selecting the best resampling method for a given imbalanced classification problem using a complex set of carefully selected meta-features extracted from the data. While there has been some limited research in the area of applying meta-learning methods to the selection of resampling strategies (e.g.~\cite{monizAutomatedImbalancedClassification2021},~\cite{sahniAidedSelectionSampling2021}), our proposal is, to the best of our knowledge, the first one to cover such an extensive set of meta-features, performance metrics, resampling techniques, and datasets. Indeed, our proposed solution includes a comprehensive set of meta-features, which covers a multitude of scenarios, such as multiclass, class overlap, and small disjuncts. Moreover, compared to previous proposals which only included a limited amount of recommended sampling strategies and performance metrics, our proposed algorithm can provide recommendations for over twenty resampling strategies, five classifiers, and nine performance metrics. This represents a significant advantage to the end-user, that this way can choose a specific composition of performance metric, classifier, and dataset to obtain tailored recommendations for their specific context, all of which can be accessed through an easy-to-use web interface. In addition to all the code of our proposed application and experiments, we also freely provided an extensive dataset on which METALLIC was trained and which incorporates the results of all meta-features, performance metrics, and base learners on all 107 tested imbalanced datasets.
+
+We tested our proposed algorithm using 3 variants which include nearest neighbors, regression, and deep learning-based methods. The regression-based technique, that uses the XGBoost algorithm, proved to perform the best when comparing the predicted rankings of the K top recommended resampling techniques to their real rankings. As such, we further tested this variant on a real-world scenario and demonstrated that the predicted scores given by METALLIC for each combination of performance metric and resampling strategy were tightly coupled with the true values of these scores. In other words, METALLIC predicts the best resampling strategies to use for a given problem with a good accuracy and is therefore able to give valuable recommendations without the need to test each strategy manually.
+
+While we believe that our proposal presents an exhaustive and accurate solution to the problem, several avenues can still be explored in the field of meta-learning systems for resampling technique selection. Among other things, we note the tuning of the proposed deep learning architecture, the addition of more base learners, and the exploration of other solutions, such as the integration of reinforcement learning as potential future work.
+
+
+%%The task of know which resampling technique is better for a given dataset is hard to solve, as there is no single best overall technique. However, to obtain a good performance it is necessary to select the best resampling technique to apply. We proposed a recommendation system which helps to identify the best resampling technique for a given dataset, learner and target metric. This system is based on the concept of Metalearning i.e learning from previous experience. After several experiments, we found that our regression model outperforms the other alternatives. With our METALLIC system the user can easily find the best sampling methods for the task at hands without wasting time and resources to test all the existing resampling methods.  In the future we plan to further improve METALLIC by trying out different regression models and by adding more learners and target metrics to get the best overall results.
+
+\section*{Declarations}
+
+\begin{itemize}
+    \item Funding: This research was supported by the Natural Sciences and Engineering Research Council of Canada;
+    \item Conflicts of interest/Competing interests: The authors have no relevant financial or non-financial interests to disclose;
+    \item Ethics approval: Not applicable;
+    \item Consent to participate: Not applicable;
+    \item Consent for publication: Not applicable;
+    \item Availability of data and material: All experiments and data are publicly available (cf. \url{https://github.com/sai-akhil/Metallic}). Our User Interface is also freely available at \url{https://metallic.pythonanywhere.com/};
+    \item Code availability: Custom code for all experiments is publicly available (cf. \url{https://github.com/sai-akhil/Metallic});
+    \item Contributions: All authors contributed to writing and research.
+\end{itemize}
+
+% BibTeX users please use one of
+%\bibliographystyle{spbasic}      % basic style, author-year citations
+%\bibliographystyle{spmpsci}      % mathematics and physical sciences
+%\bibliographystyle{spphys}       % APS-like style for physics
+\begin{flushleft}
+\printbibliography{}
+\end{flushleft}
+
+
+% \clearpage
+% \appendix
+% \begin{appendices}
+% % \appendixpage
+% \section{Results of ...}\label{app:results1}
+
+% \begin{table}[!h]
+%     \centering
+%     \begin{tabular}{c|c}
+%          &  \\
+%          & 
+%     \end{tabular}
+%     \caption{Caption}
+%     \label{tab:test1}
+% \end{table}
+
+
+% \end{appendices}
+\end{document}

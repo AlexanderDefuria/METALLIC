@@ -1,11 +1,11 @@
+from locale import normalize
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, normalize, minmax_scale
 import math
-from math import sqrt
 
 
-def preprocess(filename):
+def preprocess(filename) -> pd.DataFrame:
     """
     Steps:
     - Read the CSV file.
@@ -48,12 +48,27 @@ def preprocess(filename):
                 df[column] = df[column].round(1)
 
     # Grab the target column and move it to the last column
+    possible_class_columns = ["cls", "class", "label", "target", "output", "result", "type"]
     class_column = None
-    for col in df.columns:
-        if "class" in col.lower() in col:
-            class_column = col
+    for col in possible_class_columns:
+        if col in df.columns.str.lower():
+            index = df.columns.str.lower().tolist().index(col)
+            class_column = df.columns[index]
             break
-    df = df[[col for col in df.columns if col != class_column] + [class_column]]    
+
+    if class_column is None:
+        # Check if the target column is the last column if it is categorical
+        last_column = df.columns[-1]
+        if df[last_column].dtype == "object":
+            class_column = last_column
+        elif df[last_column].dtype == "int":
+            class_column = last_column
+            # print(f"Target column {class_column} is the last column in the dataset {filename}")
+
+    if class_column is None:
+        raise ValueError(f"No class column found in the dataset {filename}")
+    df = df[[col for col in df.columns if col != class_column] + [class_column]]
+    df.rename(columns={class_column: "cls"}, inplace=True)
 
     # Assign numeric labels based on class frequency
     class_counts = df["cls"].value_counts(ascending=False)
@@ -61,19 +76,11 @@ def preprocess(filename):
     df["cls"] = df["cls"].map(class_mapping)
 
     # Encode categorical variables using the label encoder
-    label_encoders = {}
     for column in df.columns:
         if df[column].dtype == "object":
-            le = LabelEncoder()
-            df[column] = le.fit_transform(df[column])
-            label_encoders[column] = le
+            df[column] = LabelEncoder().fit_transform(df[column])
 
-    target = df.iloc[:, -1].values  # Convert the last column to Numpy array
-    data = df.iloc[:, :-1].values  # Convert all but the last column to Numpy array
-
-    data = pd.DataFrame(data).apply(pd.to_numeric, errors="coerce").fillna(np.nan).values
-    return data, target
-
+    return pd.DataFrame(df).apply(pd.to_numeric, errors="coerce").fillna(np.nan)
 
 
 # THIS IS LEGACY CODE BUT MAY BE USEFUL FOR FUTURE REFERENCE
