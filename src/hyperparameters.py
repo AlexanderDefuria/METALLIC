@@ -52,7 +52,7 @@ HYPERPARAMETERS = {
         "subsample": Real(0.5, 1.0),
         "colsample_bytree": Real(0.5, 1.0),
         "gamma": Real(0.0, 5.0),
-        "n_neighbors": Integer(1, 50),
+        # "n_neighbors": Integer(1, 50),
         # "reg_alpha": Real(0.0, 10.0, prior="log-uniform"),
         # "reg_lambda": Real(0.0, 10.0, prior="log-uniform"),
         # "booster": Categorical(["gbtree", "gblinear", "dart"]),

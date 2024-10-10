@@ -72,6 +72,11 @@ def preprocess(filename) -> pd.DataFrame:
 
     # Assign numeric labels based on class frequency
     class_counts = df["cls"].value_counts(ascending=False)
+    
+    # If there are any classes less than 5 remove the dataset
+    if class_counts.min() < 5:
+        return None
+
     class_mapping = {cls: i for i, cls in enumerate(class_counts.index)}
     df["cls"] = df["cls"].map(class_mapping)
 
@@ -79,6 +84,13 @@ def preprocess(filename) -> pd.DataFrame:
     for column in df.columns:
         if df[column].dtype == "object":
             df[column] = LabelEncoder().fit_transform(df[column])
+
+    assert df['cls'][np.isnan(df['cls'])].size == 0
+    assert df['cls'].value_counts().min() > 1, f"{filename} has a class with only one instance"
+    assert df['cls'].unique().max() == len(df['cls'].unique()) - 1, f"{filename} has missing classes"
+
+    # Ensure that the cls is in ascending from 0 to n
+    df["cls"] = LabelEncoder().fit_transform(df["cls"])
 
     return pd.DataFrame(df).apply(pd.to_numeric, errors="coerce").fillna(np.nan)
 
