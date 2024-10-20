@@ -3,6 +3,82 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, normalize, minmax_scale
 import math
+from typing import List
+from pathlib import Path
+from tqdm import tqdm
+from scipy.io import arff
+import os
+
+def get_datasets():
+    collect_arrf_datasets()
+    datasets = collect_datasets(raw_datasets_dir())
+    datasets = [
+        dataset
+        for dataset in datasets
+        if dataset.stem
+        not in [
+            "primary-tumor",
+            "movement_libras",  # Fails with KNN & SMOTEENN
+        ]
+    ]  # Filter datasets
+
+    for dataset in tqdm(datasets, desc="Preprocessing Datasets to ../data/processed_datasets"):
+        df_processed: pd.DataFrame | None = preprocess(dataset)
+        if df_processed is not None:
+            if df_processed["cls"].value_counts().min() > 5:
+                df_processed.to_csv(processed_datasets_dir() / dataset.name, index=False)
+
+    return collect_datasets(raw_datasets_dir())
+
+def dataset_dir() -> Path:
+    return Path(__file__).parent.parent / "data"
+
+
+def arrf_datasets_dir() -> Path:
+    return Path(__file__).parent.parent / "data" / "arrf_datasets"
+
+
+def processed_datasets_dir() -> Path:
+    path = Path(__file__).parent.parent / "data" / "processed_datasets"
+    if not path.exists():
+        os.makedirs(path)
+    return path
+
+
+def raw_datasets_dir() -> Path:
+    return Path(__file__).parent.parent / "data" / "raw_datasets"
+
+
+def collect_datasets(directory: Path) -> List[Path]:
+    if not directory.exists() or not directory.is_dir():
+        return []
+
+    return list(directory.glob("*.csv"))
+
+
+def collect_arrf_datasets() -> List[Path]:
+    """
+    Collects ARFF datasets and converts them to CSV format if they have not been converted before.
+    Returns:
+        List[Path]: A list of paths to the converted CSV datasets.
+    """
+
+    existing_csv_datasets = collect_datasets(raw_datasets_dir())
+    existing_csv_datasets = [dataset.stem for dataset in existing_csv_datasets]
+    arrf_datasets = list(arrf_datasets_dir().glob("*.arff"))
+    arrf_to_process = [dataset for dataset in arrf_datasets if dataset.stem not in existing_csv_datasets]
+    converted_paths = []
+
+    for dataset in arrf_to_process:
+        data, _ = arff.loadarff(dataset)
+        df = pd.DataFrame(data)
+        path = (raw_datasets_dir() / dataset.stem).with_suffix(".csv")
+        print(f"Converting {dataset} to {path}")
+        df.to_csv(path, index=False)
+        converted_paths.append(path)
+
+    return converted_paths
+
 
 
 def preprocess(filename) -> pd.DataFrame:
