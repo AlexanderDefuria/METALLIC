@@ -1,0 +1,26 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: METALLIC
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Alexander
+    family-names: De Furia
+    email: adefu020@uottawa.ca
+    affiliation: >-
+      University of Ottawa, School of Electrical Engineering
+      and Computer Science
+    orcid: 'https://orcid.org/0009-0000-9101-3947'
+  - given-names: Paula
+    family-names: Branco
+    email: pbranco@uottawa.ca
+    affiliation: >-
+      University of Ottawa, School of Electrical Engineering
+      and Computer Science
+    orcid: 'https://orcid.org/0000-0002-9917-3694'
+repository-code: 'https://github.com/AlexanderDefuria/METALLIC'
+license: MIT
