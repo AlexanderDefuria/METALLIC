@@ -56,7 +56,7 @@ from tqdm import tqdm
 from skopt import BayesSearchCV
 from skopt.space import Categorical, Integer, Real
 from sklearn.preprocessing import MinMaxScaler
-
+import builtins
 
 
 from hyperparameters import HYPERPARAMETERS
@@ -65,6 +65,9 @@ from calculate_metafeatures import calculate_metafeatures
 
 
 
+def print(*args, **kwargs):
+    if not QUIET:
+        builtins.print(*args, **kwargs)
 
 def get_classifiers(choice: str | None = None) -> Dict[str, object]:
     classifiers = {
@@ -199,9 +202,10 @@ def train_classifiers(
             cv=StratifiedKFold(n_splits=internal_fold_count),
             refit=True,
             n_jobs=10,
+            n_iter=10,
         )
-        bayes_search.fit(X_train_resampled, y_train_resampled)
-        # bayes_search = classifier.fit(X_train_resampled, y_train_resampled)  # type: ignore
+        # bayes_search.fit(X_train_resampled, y_train_resampled)
+        bayes_search = classifier.fit(X_train_resampled, y_train_resampled)  # type: ignore
         y_pred = bayes_search.predict(X_test)
     except Exception as e:
         if DEBUG:
@@ -349,7 +353,9 @@ def get_existing_solutions(file: Path) -> list[tuple]:
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--debug", action="store_true")
+    argparser.add_argument('--quiet', action='store_true')
     DEBUG = argparser.parse_args().debug
+    QUIET = argparser.parse_args().quiet
 
     metafeature_file = Path("metafeatures.csv")
     os.system(f"touch {metafeature_file.absolute()}")
