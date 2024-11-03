@@ -362,8 +362,9 @@ if __name__ == "__main__":
     os.system("rm ../data/processed_datasets/*")
 
     datasets = get_datasets()
+    existing_solutions = get_existing_solutions(metafeature_file)
     combinations = itertools.product(datasets, get_classifiers().keys(), get_resamplers().keys())
-    combinations = [c for c in combinations if (c[0].stem, c[1], c[2]) not in get_existing_solutions(metafeature_file)]
+    combinations = [c for c in combinations if (c[0].stem, c[1], c[2]) not in existing_solutions]
 
     # Calculate metafeatures and classifiers for each dataset
     mutex = Lock()

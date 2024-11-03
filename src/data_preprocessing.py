@@ -28,7 +28,7 @@ def get_datasets():
             if df_processed["cls"].value_counts().min() > 5:
                 df_processed.to_csv(processed_datasets_dir() / dataset.name, index=False)
 
-    return collect_datasets(raw_datasets_dir())
+    return collect_datasets(processed_datasets_dir())
 
 def dataset_dir() -> Path:
     return Path(__file__).parent.parent / "data"
