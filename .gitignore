@@ -13,7 +13,8 @@ catboost_info
 !paper/refs.bib
 !paper/old_refs.bib
 /src/model_details
-
+*.out
+*.csv
 
 
 

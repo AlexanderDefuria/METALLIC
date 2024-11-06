@@ -1,5 +1,8 @@
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing as mp
 import os
+import fcntl
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
 from typing import Dict, List, Any
@@ -64,11 +67,6 @@ import argparse
 from calculate_metafeatures import calculate_metafeatures
 
 
-
-def print(*args, **kwargs):
-    if not QUIET:
-        builtins.print(*args, **kwargs)
-
 def get_classifiers(choice: str | None = None) -> Dict[str, object]:
     classifiers = {
         "xgb": XGBClassifier(),
@@ -127,6 +125,7 @@ def train_classifiers(
     classifier_name: str,
     resampler_name: str,
     file_name: str,
+    quick: bool = False,
 ) -> Dict[str, Any] | None:
     """
     Resample the dataset and train the classifier
@@ -196,17 +195,17 @@ def train_classifiers(
             min_samples = min(y_train.value_counts().min() - 1, 10)  # Bound n_neighbours <= n_samples in each fold
             selected_search_space["n_neighbors"] = Integer(1, min_samples)
 
-        bayes_search = BayesSearchCV(
+        model = BayesSearchCV(
             estimator=classifier,
             search_spaces=selected_search_space,
             cv=StratifiedKFold(n_splits=internal_fold_count),
             refit=True,
             n_jobs=10,
             n_iter=10,
-        )
-        # bayes_search.fit(X_train_resampled, y_train_resampled)
-        bayes_search = classifier.fit(X_train_resampled, y_train_resampled)  # type: ignore
-        y_pred = bayes_search.predict(X_test)
+        ) if not quick else classifier
+        
+        model = model.fit(X_train_resampled, y_train_resampled)  # type: ignore
+        y_pred = model.predict(X_test)
     except Exception as e:
         if DEBUG:
             print(f"Error training {classifier_name} with {resampler_name}")
@@ -222,8 +221,8 @@ def train_classifiers(
             return None
 
     # Don't break if we're using a classifier that doesn't have predict_proba
-    if hasattr(bayes_search, "predict_proba"):
-        lr_probs = bayes_search.predict_proba(X_test)
+    if hasattr(model, "predict_proba"):
+        lr_probs = model.predict_proba(X_test)
     else:
         # Assign the predicted probabilities to the y_pred variable
         lr_probs = np.zeros((len(y_pred), 2))
@@ -264,7 +263,7 @@ def train_classifiers(
     class_weights = compute_class_weight(class_weight="balanced", classes=np.unique(y_test), y=y_test)
     recall_per_class, _, _, _ = precision_recall_fscore_support(y_test, y_pred, average=None, labels=np.unique(y_test))
     cwa = float(np.average(recall_per_class, weights=class_weights))
-    ideal_hyperparameters = bayes_search.best_params_ if hasattr(bayes_search, "best_params_") else {}
+    ideal_hyperparameters = model.best_params_ if hasattr(model, "best_params_") else {}
     print(f"Accuracy: {accuracy_score(y_test, y_pred)} for {classifier_name} with {resampler_name} on {file_name}")
 
     return {
@@ -300,12 +299,18 @@ def train(args: tuple) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the calculated metafeatures and training results.
     """
     file = args[0]
+    file_name = file.stem
     classifier_name = args[1]
     resampler_name = args[2]
-    file_name = file.stem
+    quick = args[3]
 
-    metafeatures = calculate_metafeatures(file)
-    dataset = pd.read_csv(file)
+    print(f"Started {file_name} - {classifier_name} - {resampler_name}")
+    try:
+        dataset = pd.read_csv(file)
+        time.sleep(1)
+        metafeatures = calculate_metafeatures(file)
+    except Exception as e:
+        raise ValueError(f"Could not read or calculate {file_name}")
 
     # Target variable is defined as the last column in the dataset
     y: pd.Series = pd.Series(dataset.iloc[:, -1].copy())
@@ -331,6 +336,7 @@ def train(args: tuple) -> pd.DataFrame:
             classifier_name,
             resampler_name,
             file_name,
+            quick,
         )
         if scores is not None:
             scores_df: pd.DataFrame = pd.DataFrame.from_dict([scores])  # type: ignore
@@ -342,44 +348,84 @@ def train(args: tuple) -> pd.DataFrame:
     return pd.concat([pd.DataFrame([metafeatures]), training_results], axis=1, ignore_index=False, sort=False, join="inner")
 
 
+
 def get_existing_solutions(file: Path) -> list[tuple]:
     try:
         df = pd.read_csv(file)
         return list(df[['dataset', 'learner', 'resampler']].apply(lambda x: (x[0], x[1], x[2]), axis=1))
-    except Exception:
-        return []
+    except Exception as e:
+        print("No solutions")
+    return [] 
 
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--debug", action="store_true")
-    argparser.add_argument('--quiet', action='store_true')
+    argparser.add_argument("--quick", action="store_true")
+    argparser.add_argument("--cpu", default=1)
+    argparser.add_argument("--slurmid", default=1)
+    argparser.add_argument("--slurmcount", default=1)
+    argparser.add_argument("--datadir", default="/home/adefu020/projects/def-pbranco/adefu020/METALLIC/data")
+    argparser.add_argument("--homedir", default="/home/adefu020/projects/def-pbranco/adefu020/METALLIC")
+
     DEBUG = argparser.parse_args().debug
-    QUIET = argparser.parse_args().quiet
+    CPUS = int(argparser.parse_args().cpu)
+    QUICK = argparser.parse_args().quick
+    SLURMID = int(argparser.parse_args().slurmid)
+    SLURMCOUNT = int(argparser.parse_args().slurmcount)
+    DATADIR = argparser.parse_args().datadir
+    home_dir = Path(argparser.parse_args().homedir)
+    assert CPUS >= 1
+    print(f"SLURMID: {SLURMID} with {CPUS} CPUS")
 
-    metafeature_file = Path("metafeatures.csv")
-    os.system(f"touch {metafeature_file.absolute()}")
-    os.system("rm ../data/processed_datasets/*")
+    if SLURMCOUNT>1:
+        metafeature_file = home_dir / f"metafeatures_{SLURMID}.csv"
+        existing_solutions = get_existing_solutions(home_dir / "merged_metafeatures.csv")
+    else:
+        metafeature_file = home_dir / "metafeatures.csv"
+        existing_solutions = get_existing_solutions(metafeature_file)
 
-    datasets = get_datasets()
-    existing_solutions = get_existing_solutions(metafeature_file)
-    combinations = itertools.product(datasets, get_classifiers().keys(), get_resamplers().keys())
+    data_dir: Path = Path(DATADIR)
+    datasets = get_datasets(data_dir)
+
+    datasets = sorted(datasets)
+    combinations = itertools.product(datasets, get_classifiers().keys(), get_resamplers().keys(), [QUICK])
     combinations = [c for c in combinations if (c[0].stem, c[1], c[2]) not in existing_solutions]
+    combinations = combinations[SLURMID-1::SLURMCOUNT]
 
     # Calculate metafeatures and classifiers for each dataset
-    mutex = Lock()
-    with ThreadPoolExecutor(max_workers=1) as p:
-        for i, result in enumerate(p.map(train, combinations)):
-            try:
-                metafeatures = pd.read_csv(metafeature_file)
-            except Exception as e:
-                metafeatures = pd.DataFrame()
+    print(f"START COMPUTE for {len(combinations)} COMBINATIONS")
 
-            try:
-                metafeatures = pd.concat([metafeatures, result], ignore_index=True)
-            except pd.errors.EmptyDataError:
-                metafeatures = result
+    with mp.Pool(processes = CPUS) as pool:
+        for result in pool.imap_unordered(train, combinations):
+            if result is None:
+                print("Failed Result...")
+                continue
+                                                                  
+            if not metafeature_file.exists():
+                result.to_csv(metafeature_file, index=False)
+            else:
+                f = open(metafeature_file, 'a')
+                f.write(result.to_csv(index=False, header=False))
+                f.close()
 
-            metafeatures.to_csv(metafeature_file, index=False)
+    #with ThreadPoolExecutor(max_workers=CPUS) as p:
+    #    for i, result in enumerate(p.map(train, combinations)):
+    #        if result is None:
+    #            print("None result")
+    #            continue
+
+    #        if not metafeature_file.exists():
+    #            result.to_csv(metafeature_file, index=False)
+    #        else:
+    #            f = open(metafeature_file, 'a')
+    #            f.write(result.to_csv(index=False, header=False))
+    #            f.close()
+
+    #        os.system(f"echo {i}")
+
+    #        print(f"Finished {i}")
+                
+            
 
     print("Done!")

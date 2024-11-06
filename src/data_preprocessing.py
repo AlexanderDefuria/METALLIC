@@ -9,7 +9,10 @@ from tqdm import tqdm
 from scipy.io import arff
 import os
 
-def get_datasets():
+DATA_DIR: Path = Path(__file__).parent.parent / "data"
+
+def get_datasets(path: Path = Path(__file__).parent.parent / "data"):
+    DATA_DIR = path
     collect_arrf_datasets()
     datasets = collect_datasets(raw_datasets_dir())
     datasets = [
@@ -22,7 +25,8 @@ def get_datasets():
         ]
     ]  # Filter datasets
 
-    for dataset in tqdm(datasets, desc="Preprocessing Datasets to ../data/processed_datasets"):
+    #for dataset in tqdm(datasets, desc="Preprocessing Datasets to ../data/processed_datasets"):
+    for dataset in datasets:
         df_processed: pd.DataFrame | None = preprocess(dataset)
         if df_processed is not None:
             if df_processed["cls"].value_counts().min() > 5:
@@ -31,22 +35,22 @@ def get_datasets():
     return collect_datasets(processed_datasets_dir())
 
 def dataset_dir() -> Path:
-    return Path(__file__).parent.parent / "data"
+    return DATA_DIR
 
 
 def arrf_datasets_dir() -> Path:
-    return Path(__file__).parent.parent / "data" / "arrf_datasets"
+    return DATA_DIR / "arrf_datasets"
 
 
 def processed_datasets_dir() -> Path:
-    path = Path(__file__).parent.parent / "data" / "processed_datasets"
+    path = DATA_DIR / "processed_datasets"
     if not path.exists():
         os.makedirs(path)
     return path
 
 
 def raw_datasets_dir() -> Path:
-    return Path(__file__).parent.parent / "data" / "raw_datasets"
+    return DATA_DIR / "raw_datasets"
 
 
 def collect_datasets(directory: Path) -> List[Path]:
