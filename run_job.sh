@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --time=01:00:00
+#SBATCH --time=06:00:00
 #SBATCH --account=def-pbranco
 #SBATCH --mail-user=adefu020@uottawa.ca
 #SBATCH --mail-type=ALL
 #SBATCH --mem-per-cpu=2G
 #SBATCH --cpus-per-task=40
-#SBATCH --array=1-200
+#SBATCH --array=1-10
 
 HOME_DIR=/home/adefu020/projects/def-pbranco/adefu020/METALLIC
 module load StdEnv/2023 python/3.10
