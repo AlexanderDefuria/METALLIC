@@ -6,6 +6,7 @@ ipykernel
 ipython
 numpy~=1.26.0
 pandas
+pathos
 scikit-optimize==0.9.0
 scikit-learn~=1.4.0
 scipy~=1.14.0

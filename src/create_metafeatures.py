@@ -1,4 +1,5 @@
 import multiprocessing as mp
+from pathos.pools import ProcessPool
 import os
 import fcntl
 import time
@@ -200,11 +201,10 @@ def train_classifiers(
             search_spaces=selected_search_space,
             cv=StratifiedKFold(n_splits=internal_fold_count),
             refit=True,
-            n_jobs=10,
-            n_iter=10,
+            n_jobs=1,
+            n_iter=5,
         ) if not quick else classifier
-        
-        model = model.fit(X_train_resampled, y_train_resampled)  # type: ignore
+        model.fit(X_train_resampled, y_train_resampled)  # type: ignore
         y_pred = model.predict(X_test)
     except Exception as e:
         if DEBUG:
@@ -389,6 +389,7 @@ if __name__ == "__main__":
     datasets = get_datasets(data_dir)
 
     datasets = sorted(datasets)
+    datasets = [dataset for dataset in datasets if "geobia" in dataset.stem.lower()]
     combinations = itertools.product(datasets, get_classifiers().keys(), get_resamplers().keys(), [QUICK])
     combinations = [c for c in combinations if (c[0].stem, c[1], c[2]) not in existing_solutions]
     combinations = combinations[SLURMID-1::SLURMCOUNT]
@@ -396,8 +397,10 @@ if __name__ == "__main__":
     # Calculate metafeatures and classifiers for each dataset
     print(f"START COMPUTE for {len(combinations)} COMBINATIONS")
 
-    with mp.Pool(processes = CPUS) as pool:
-        for result in pool.imap_unordered(train, combinations):
+    #with mp.Pool(processes = CPUS) as pool:
+    with ProcessPool() as pool:
+        #for result in pool.imap_unordered(train, combinations):
+        for result in pool.imap(train, combinations):
             if result is None:
                 print("Failed Result...")
                 continue
@@ -405,27 +408,10 @@ if __name__ == "__main__":
             if not metafeature_file.exists():
                 result.to_csv(metafeature_file, index=False)
             else:
+                print(result.to_csv(index=False, header=False))
                 f = open(metafeature_file, 'a')
                 f.write(result.to_csv(index=False, header=False))
                 f.close()
-
-    #with ThreadPoolExecutor(max_workers=CPUS) as p:
-    #    for i, result in enumerate(p.map(train, combinations)):
-    #        if result is None:
-    #            print("None result")
-    #            continue
-
-    #        if not metafeature_file.exists():
-    #            result.to_csv(metafeature_file, index=False)
-    #        else:
-    #            f = open(metafeature_file, 'a')
-    #            f.write(result.to_csv(index=False, header=False))
-    #            f.close()
-
-    #        os.system(f"echo {i}")
-
-    #        print(f"Finished {i}")
-                
-            
+       
 
     print("Done!")
