@@ -34,6 +34,7 @@ def get_datasets(path: Path = Path(__file__).parent.parent / "data"):
 
     return collect_datasets(processed_datasets_dir())
 
+
 def dataset_dir() -> Path:
     return DATA_DIR
 
@@ -82,7 +83,6 @@ def collect_arrf_datasets() -> List[Path]:
         converted_paths.append(path)
 
     return converted_paths
-
 
 
 def preprocess(filename) -> pd.DataFrame:
@@ -152,7 +152,7 @@ def preprocess(filename) -> pd.DataFrame:
 
     # Assign numeric labels based on class frequency
     class_counts = df["cls"].value_counts(ascending=False)
-    
+
     # If there are any classes less than 5 remove the dataset
     if class_counts.min() < 5:
         return None
@@ -165,9 +165,9 @@ def preprocess(filename) -> pd.DataFrame:
         if df[column].dtype == "object":
             df[column] = LabelEncoder().fit_transform(df[column])
 
-    assert df['cls'][np.isnan(df['cls'])].size == 0
-    assert df['cls'].value_counts().min() > 1, f"{filename} has a class with only one instance"
-    assert df['cls'].unique().max() == len(df['cls'].unique()) - 1, f"{filename} has missing classes"
+    assert df["cls"][np.isnan(df["cls"])].size == 0
+    assert df["cls"].value_counts().min() > 1, f"{filename} has a class with only one instance"
+    assert df["cls"].unique().max() == len(df["cls"].unique()) - 1, f"{filename} has missing classes"
 
     # Ensure that the cls is in ascending from 0 to n
     df["cls"] = LabelEncoder().fit_transform(df["cls"])

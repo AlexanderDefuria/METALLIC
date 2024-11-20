@@ -2,8 +2,8 @@ import os
 import torch
 import numpy as np
 import torch.nn as nn
+from pathlib import Path
 from torch.optim.adam import Adam
-from typing import Self
 from create_metafeatures import calculate_metafeatures
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
@@ -13,7 +13,7 @@ input_size = 32
 
 class MetallicDL:
     @classmethod
-    def load(cls, path) -> Self:
+    def load(cls, path):
         self = cls()
         self.model.load_state_dict(torch.load(path, weights_only=True))
         self.model.eval()
@@ -70,13 +70,20 @@ class MetallicDL:
 
 if __name__ == '__main__':
     # Parameters
-    details_dir = 'model_details'
+    if torch.backends.mps.is_available():
+        mps_device = torch.device("mps")
+    else:
+        print ("MPS device not found.")
+    
+    metallic_dir = Path(__file__).parent.parent.resolve()
+    details_dir = metallic_dir / 'src/model_details'
     os.makedirs(details_dir, exist_ok=True)
     metric = "accuracy"
-    learner = "dt"
+    learner = "rf"
 
     # Train data
-    data = pd.read_csv('metafeatures_dt.csv')
+    data = pd.read_csv(metallic_dir / 'metafeatures.csv')
+    # data = pd.read_csv('merged_metafeatures.csv')
     data = data.dropna()
     data = data.drop('dataset', axis=1)
     data = data.drop('ideal_hyperparameters', axis=1)
@@ -92,23 +99,32 @@ if __name__ == '__main__':
     encoded_data.columns = encoder.get_feature_names_out(encoded_columns)
     data = data.drop(encoded_columns, axis=1)
     data = pd.concat([data, encoded_data], axis=1)
-    
+    data = data.dropna()
+    print(data)
+
     # Cleanup columns
     metrics = ["accuracy", "f1", "precision", "recall", "roc_auc", "balanced_accuracy", "geometric_mean", "cwa", "roc_auc", "pr_auc"]
-    y = torch.tensor(data[metric].dropna(), dtype=torch.float32)
-    data[metric].dropna().to_csv(f'{details_dir}/y.csv')
+
+    y = torch.tensor(data[metric].to_numpy(), dtype=torch.float32)
+    data[metric].to_csv(f'{details_dir}/y.csv', index=False)
     X = data.drop(metrics, axis=1)
-    # X = encoded_data
-    X.to_csv(f'{details_dir}/X.csv')
+    X.to_csv(f'{details_dir}/X.csv', index=False)
 
     # Pad to 64 rows
-    X = torch.tensor(X.values, dtype=torch.float)
+    X = torch.tensor(X.to_numpy(np.float32), dtype=torch.float32)
     X = torch.nn.functional.pad(X, (0, input_size - X.shape[1]))
     model = MetallicDL(test=True)
+
+    print(X.shape)
+    print(y.shape)
+    assert model.predict(X).shape[0] == y.shape[0]
+
     model.train(X, y, epochs=100, lr=0.01)
+    model.save(details_dir / 'model.pth')
+
 
     # Load test data
-    X = calculate_metafeatures(Path('../data/processed_datasets/collins.csv'))
+    X = calculate_metafeatures( metallic_dir / 'data/processed_datasets/collins.csv')
     X = pd.DataFrame.from_dict(X, orient='index').T
     
     for resampler in resamplers:
@@ -124,6 +140,8 @@ if __name__ == '__main__':
         
         x = torch.tensor(x.values, dtype=torch.float)
         x = torch.nn.functional.pad(x, (0, input_size - x.shape[1]))
-        print(f'{resampler}: {model.predict(x)}')
+        pred = model.predict(x)
+        pred = pred.pow(2)
+        print(f'{resampler}: {pred}')
 
 
