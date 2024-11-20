@@ -369,7 +369,7 @@ if __name__ == "__main__":
     argparser.add_argument("--homedir", default="/home/adefu020/projects/def-pbranco/adefu020/METALLIC")
 
     DEBUG = argparser.parse_args().debug
-    CPUS = int(argparser.parse_args().cpu) * 5
+    CPUS = int(argparser.parse_args().cpu)
     QUICK = argparser.parse_args().quick
     SLURMID = int(argparser.parse_args().slurmid)
     SLURMCOUNT = int(argparser.parse_args().slurmcount)

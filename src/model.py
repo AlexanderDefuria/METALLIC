@@ -142,6 +142,7 @@ if __name__ == '__main__':
         x = torch.nn.functional.pad(x, (0, input_size - x.shape[1]))
         pred = model.predict(x)
         pred = pred.pow(2)
+        pred = pred.detach().numpy().flatten()[0]
         print(f'{resampler}: {pred}')
 
 
