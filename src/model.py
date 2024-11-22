@@ -25,7 +25,9 @@ class MetallicDL:
             # Functional Network
             nn.Linear(self.input_size, 512),
             nn.LeakyReLU(),
-            nn.Linear(512, 64),
+            nn.Linear(512, 256),
+            nn.Sigmoid(),
+            nn.Linear(256, 64),
             nn.Sigmoid(),
             nn.Linear(64, 32),
             nn.LeakyReLU(),
@@ -51,7 +53,7 @@ class MetallicDL:
     def predict(self, x):
         return self.model(x)
 
-    def train(self, x, y, epochs=700, lr=0.001):
+    def train(self, x, y, epochs=500, lr=0.001):
         criterion = nn.L1Loss()
         optimizer = Adam(self.model.parameters(), lr=lr)
 
@@ -106,7 +108,7 @@ if __name__ == '__main__':
     
     metallic_dir = Path(__file__).parent.parent.resolve()
     data = pd.read_csv(metallic_dir / 'metafeatures.csv')
-    data = data[data['dataset'] != 'wine']
+    data = data[data['dataset'] != 'collins']
     data = data.reset_index(drop=True)
     data, encoder, scaler = preprocess(data)
     selected_target = 'accuracy'
@@ -145,6 +147,8 @@ if __name__ == '__main__':
     
     for pred_i, true_i, labels in zip(pred.flatten().tolist(), true.tolist(), text_labels):
         print(f'Predicted: {pred_i:.3f}, True: {true_i:.3f} for {labels[0]} with {labels[1]}')
+
+    print(f"Mean Average Error for the validation set: {loss(pred, true).item()}")
 
 
 
