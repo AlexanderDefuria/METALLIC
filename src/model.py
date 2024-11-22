@@ -6,10 +6,9 @@ from pathlib import Path
 from torch.optim.adam import Adam
 from create_metafeatures import calculate_metafeatures
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler, Normalizer, OneHotEncoder
 from pathlib import Path
 
-input_size = 32
 
 class MetallicDL:
     @classmethod
@@ -21,14 +20,19 @@ class MetallicDL:
 
     def __init__(self, **kwargs):
         self.test = kwargs.get('test', False)
+        self.input_size = kwargs.get('input_size', 58)
         self.model = nn.Sequential(
             # Functional Network
-            nn.Linear(input_size, 32, bias=True),
+            nn.Linear(self.input_size, 512),
+            nn.LeakyReLU(),
+            nn.Linear(512, 64),
             nn.Sigmoid(),
-            nn.Linear(32, 1, bias=True),
-            nn.Sigmoid(),
+            nn.Linear(64, 32),
+            nn.LeakyReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid()
             # Paper Network
-            # nn.Linear(input_size, 64),
+            # nn.Linear(self.input_size, 64),
             # nn.ReLU(),
             # nn.Linear(64, 32),
             # nn.ReLU(),
@@ -36,7 +40,7 @@ class MetallicDL:
             # nn.ReLU(),
             # nn.Linear(16, 1),
             # nn.Sigmoid()
-        )
+        ).to(mps_device)
 
     def forward(self, x):
         return self.model(x)
@@ -47,8 +51,8 @@ class MetallicDL:
     def predict(self, x):
         return self.model(x)
 
-    def train(self, x, y, epochs=50, lr=0.01):
-        criterion = nn.BCELoss()
+    def train(self, x, y, epochs=700, lr=0.001):
+        criterion = nn.L1Loss()
         optimizer = Adam(self.model.parameters(), lr=lr)
 
         for epoch in range(epochs):
@@ -57,92 +61,93 @@ class MetallicDL:
             loss = criterion(y_pred, y)
             loss.backward()
             optimizer.step()
-            # if epoch % 1 == 0:
-                # print(f'Epoch: {epoch}, Loss: {loss.item()}')
+            if epoch % 50 == 0:
+                print(f'Epoch: {epoch}, Loss: {loss.item()}')
+                print(x.shape)
 
-        return self.model
+        return self
 
-    def evaluate(self, x, y):
-        y_pred = self.model(x)
-        return y_pred, y
 
+def preprocess(data: pd.DataFrame, encoder = None, scaler = None):
+    data = data.dropna()
+    data.drop(columns=[ 'ideal_hyperparameters', 'dataset'], inplace=True)
+    # One hot encode the categorical data
+    columns = ['learner', 'resampler']
+    possible_targets = ['accuracy', 'f1', 'precision', 'recall', 'roc_auc', 'pr_auc', 'balanced_accuracy', 'geometric_mean']
+    selected_target = 'accuracy'
+    possible_targets.remove(selected_target)
+
+    data = data.drop(columns=possible_targets)
+
+    unnormalized_columns = columns + [selected_target]
+    if scaler is None:
+        scaler = MinMaxScaler(clip=True)
+        scaler.fit(data.drop(columns=unnormalized_columns))
+    data[data.drop(columns=unnormalized_columns).columns] = scaler.transform(data.drop(columns=unnormalized_columns))
+
+
+    if encoder is None:
+        encoder = OneHotEncoder()
+        encoder.fit(data[columns])
+    encoded = encoder.transform(data[columns]).toarray() # type: ignore
+    data = data.drop(columns=columns)
+    orginal_columns = data.columns
+    data = pd.concat([data, pd.DataFrame(encoded)], axis=1, ignore_index=True)
+    data.columns = list(orginal_columns) +  list(encoder.get_feature_names_out(columns))
+    return data, encoder, scaler
 
 
 if __name__ == '__main__':
-    # Parameters
     if torch.backends.mps.is_available():
         mps_device = torch.device("mps")
     else:
         print ("MPS device not found.")
+        raise SystemExit
     
     metallic_dir = Path(__file__).parent.parent.resolve()
-    details_dir = metallic_dir / 'src/model_details'
-    os.makedirs(details_dir, exist_ok=True)
-    metric = "accuracy"
-    learner = "rf"
-
-    # Train data
     data = pd.read_csv(metallic_dir / 'metafeatures.csv')
-    # data = pd.read_csv('merged_metafeatures.csv')
-    data = data.dropna()
-    data = data.drop('dataset', axis=1)
-    data = data.drop('ideal_hyperparameters', axis=1)
-    data = data[data["learner"] == learner]
-    data = data.drop("learner", axis=1) # type: ignore
+    data = data[data['dataset'] != 'wine']
+    data = data.reset_index(drop=True)
+    data, encoder, scaler = preprocess(data)
+    selected_target = 'accuracy'
 
-
-    # One hot encode the categorical variables
-    resamplers = data['resampler'].unique() # type: ignore
-    encoded_columns = ['resampler']
-    encoder = OneHotEncoder()
-    encoded_data = pd.DataFrame(encoder.fit_transform(data[encoded_columns]).toarray())
-    encoded_data.columns = encoder.get_feature_names_out(encoded_columns)
-    data = data.drop(encoded_columns, axis=1)
-    data = pd.concat([data, encoded_data], axis=1)
-    data = data.dropna()
     print(data)
+    test = data.sample(frac=0.01)
+    train = data.drop(index=list(test.index))
+    train_x = torch.tensor(train.drop(columns=[selected_target]).values).type(torch.float32)
+    train_y = torch.tensor(train[selected_target].values).type(torch.float32)
+    test_x = torch.tensor(test.drop(columns=[selected_target]).values).type(torch.float32)
+    test_y = torch.tensor(test[selected_target].values).type(torch.float32)
+    train_x = train_x.to(mps_device)
+    train_y = train_y.to(mps_device)
+    test_x = test_x.to(mps_device)
+    test_y = test_y.to(mps_device)
 
-    # Cleanup columns
-    metrics = ["accuracy", "f1", "precision", "recall", "roc_auc", "balanced_accuracy", "geometric_mean", "cwa", "roc_auc", "pr_auc"]
+    model = MetallicDL(input_size=train_x.shape[1])
+    model.train(train_x, train_y)
 
-    y = torch.tensor(data[metric].to_numpy(), dtype=torch.float32)
-    data[metric].to_csv(f'{details_dir}/y.csv', index=False)
-    X = data.drop(metrics, axis=1)
-    X.to_csv(f'{details_dir}/X.csv', index=False)
-
-    # Pad to 64 rows
-    X = torch.tensor(X.to_numpy(np.float32), dtype=torch.float32)
-    X = torch.nn.functional.pad(X, (0, input_size - X.shape[1]))
-    model = MetallicDL(test=True)
-
-    print(X.shape)
-    print(y.shape)
-    assert model.predict(X).shape[0] == y.shape[0]
-
-    model.train(X, y, epochs=100, lr=0.01)
-    model.save(details_dir / 'model.pth')
+    # Test using mean squared error
+    pred = model.predict(test_x)
+    loss = nn.MSELoss()
+    print(f'Mean Average Error: {loss(pred, test_y).item()}')
 
 
-    # Load test data
-    X = calculate_metafeatures( metallic_dir / 'data/processed_datasets/collins.csv')
-    X = pd.DataFrame.from_dict(X, orient='index').T
+    vdf = pd.read_csv(metallic_dir / 'metafeatures.csv')
+    # vdf = vdf[vdf['dataset'] == 'wine']
+    vdf = vdf[vdf['dataset'] == 'collins']
+    vdf = vdf.reset_index(drop=True)
+    vdf, _, _ = preprocess(vdf, encoder, scaler)
+
+    pred = model.predict(torch.tensor(vdf.drop(columns=[selected_target]).values).type(torch.float32).to(mps_device))
+    true = torch.tensor(vdf[selected_target].values).type(torch.float32).to(mps_device)
     
-    for resampler in resamplers:
-        x = X.copy()
-        x["resampler"] = resampler
-        encoded_cols = pd.DataFrame(encoder.transform(x[encoded_columns]).toarray())
-        encoded_cols.columns = encoder.get_feature_names_out(encoded_columns)
-        x = x.drop(encoded_columns, axis=1)
-        x = x.drop("dataset", axis=1)
-        x = pd.concat([x, encoded_cols], axis=1)
-        x = encoded_cols
-        x = x.astype(float)
-        
-        x = torch.tensor(x.values, dtype=torch.float)
-        x = torch.nn.functional.pad(x, (0, input_size - x.shape[1]))
-        pred = model.predict(x)
-        pred = pred.pow(2)
-        pred = pred.detach().numpy().flatten()[0]
-        print(f'{resampler}: {pred}')
+    for pred_i, true_i in zip(pred.flatten().tolist(), true.tolist()):
+        print(f'Predicted: {pred_i}, True: {true_i}')
+
+    print(f'Mean Average Error: {loss(torch.tensor(pred).to(mps_device), true).item()}')
+
+
+
+    
 
 
