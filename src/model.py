@@ -111,7 +111,6 @@ if __name__ == '__main__':
     data, encoder, scaler = preprocess(data)
     selected_target = 'accuracy'
 
-    print(data)
     test = data.sample(frac=0.01)
     train = data.drop(index=list(test.index))
     train_x = torch.tensor(train.drop(columns=[selected_target]).values).type(torch.float32)
@@ -138,13 +137,15 @@ if __name__ == '__main__':
     vdf = vdf.reset_index(drop=True)
     vdf, _, _ = preprocess(vdf, encoder, scaler)
 
+    one_hot_columns = [col for col in vdf.columns if 'learner' in col or 'resampler' in col]
+    text_labels = encoder.inverse_transform(vdf[one_hot_columns])
+
     pred = model.predict(torch.tensor(vdf.drop(columns=[selected_target]).values).type(torch.float32).to(mps_device))
     true = torch.tensor(vdf[selected_target].values).type(torch.float32).to(mps_device)
     
-    for pred_i, true_i in zip(pred.flatten().tolist(), true.tolist()):
-        print(f'Predicted: {pred_i}, True: {true_i}')
+    for pred_i, true_i, labels in zip(pred.flatten().tolist(), true.tolist(), text_labels):
+        print(f'Predicted: {pred_i:.3f}, True: {true_i:.3f} for {labels[0]} with {labels[1]}')
 
-    print(f'Mean Average Error: {loss(torch.tensor(pred).to(mps_device), true).item()}')
 
 
 
