@@ -48,7 +48,7 @@ class MetallicDL:
             # nn.ReLU(),
             # nn.Linear(16, 1),
             # nn.Sigmoid()
-        ).to(mps_device)
+        ).to(device)
 
     def forward(self, x):
         return self.model(x)
@@ -107,12 +107,12 @@ def preprocess(data: pd.DataFrame, selected_target: str, encoder = None, scaler 
 
 if __name__ == '__main__':
     if torch.backends.mps.is_available():
-        mps_device = torch.device("mps")
+        device = torch.device("mps")
     elif torch.cuda.is_available():
-        mps_device = torch.device("cuda")
+        device = torch.device("cuda")
     else:
         print ("MPS/CUDA device not found.")
-        raise SystemExit
+        device = torch.device("cpu")
     
     total = []
     for selected_target in ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy', 'geometric_mean']:
@@ -130,10 +130,10 @@ if __name__ == '__main__':
             test_y = torch.tensor(test[selected_target].values)
 
 
-            train_x = train_x.type(torch.float32).to(mps_device)
-            train_y = train_y.type(torch.float32).to(mps_device)
-            test_x = test_x.type(torch.float32).to(mps_device)
-            test_y = test_y.type(torch.float32).to(mps_device)
+            train_x = train_x.type(torch.float32).to(device)
+            train_y = train_y.type(torch.float32).to(device)
+            test_x = test_x.type(torch.float32).to(device)
+            test_y = test_y.type(torch.float32).to(device)
         
             model = MetallicDL(input_size=train_x.shape[1], verbose=False)
             model.train(train_x, train_y)
@@ -151,5 +151,3 @@ if __name__ == '__main__':
 
 
     
-
-
