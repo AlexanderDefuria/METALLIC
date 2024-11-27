@@ -116,13 +116,13 @@ if __name__ == '__main__':
     
     total = []
     for selected_target in ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy', 'geometric_mean']:
-        for i in range(0, 100):
+        for i in range(0, 1):
             metallic_dir = Path(__file__).parent.parent.resolve()
             data = pd.read_csv(metallic_dir / 'metafeatures.csv')
             data = data.reset_index(drop=True)
             data, encoder, scaler = preprocess(data, selected_target)
         
-            test = data.sample(frac=0.10)
+            test = data.sample(frac=0.01)
             train = data.drop(index=list(test.index))
             train_x = torch.tensor(train.drop(columns=[selected_target]).values)
             train_y = torch.tensor(train[selected_target].values)
@@ -135,13 +135,16 @@ if __name__ == '__main__':
             test_x = test_x.type(torch.float32).to(device)
             test_y = test_y.type(torch.float32).to(device)
         
-            model = MetallicDL(input_size=train_x.shape[1], verbose=False)
+            # model = MetallicDL(input_size=train_x.shape[1], verbose=False)
+            model = MetallicDL.load(f'model_{selected_target}.pth')
             model.train(train_x, train_y)
+            model.save(f'model_{selected_target}.pth')
         
             # Test using mean squared error
             pred = model.predict(test_x)
             loss = nn.L1Loss()
             total.append([selected_target, loss(pred, test_y).item()])
+            break
     
     df = pd.DataFrame(total, columns=['Target', 'Error'])
     print(f'Mean Average Error: {np.mean(df["Error"])}')
