@@ -1,10 +1,11 @@
 #!/bin/bash
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --account=def-pbranco
 #SBATCH --mail-user=adefu020@uottawa.ca
 #SBATCH --mail-type=ALL
-#SBATCH --mem-per-cpu=2G
+#SBATCH --mem-per-cpu=2000M
 #SBATCH --cpus-per-task=40
+#SBATCH --ntasks-per-node=1
 #SBATCH --array=1-10
 
 HOME_DIR=/home/adefu020/projects/def-pbranco/adefu020/METALLIC
@@ -21,6 +22,7 @@ then
     SLURM_ARRAY_TASK_COUNT=1
     SLURM_ARRAY_TASK_ID=1
     cp -r $HOME_DIR/data $SLURM_TMPDIR/
+
     echo $SLURM_TMPDIR
 else
     srun --ntasks=$SLURM_NNODES --ntasks-per-node=1 cp -r $HOME_DIR/data  $SLURM_TMPDIR
@@ -34,8 +36,15 @@ echo $SLURM_ARRAY_TASK_ID
 #fi
 
 echo "STARTING"
-python3 $HOME_DIR/src/create_metafeatures.py --quick --debug --cpu=$SLURM_CPUS_PER_TASK --slurmid=$SLURM_ARRAY_TASK_ID --slurmcount=$SLURM_ARRAY_TASK_COUNT --datadir=$SLURM_TMPDIR/data 
+export OMP_NUM_THREADS=1
 
+# Timeout 10 minutes shy of 12 hours 42600s
+timeout 170000 python3 $HOME_DIR/src/create_metafeatures.py --cpu=$SLURM_CPUS_PER_TASK --slurmid=$SLURM_ARRAY_TASK_ID --slurmcount=$SLURM_ARRAY_TASK_COUNT --tempdir=$SLURM_TMPDIR 
+       
 
+echo "CLEANUP"
+
+mkdir -p $HOME_DIR/out
+cp -r $SLURM_TMPDIR/*.csv $HOME_DIR/out
 
 echo "END JOB SCRIPT"

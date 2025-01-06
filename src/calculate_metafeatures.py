@@ -48,8 +48,8 @@ def calculate_hypershpere_metadata(X: pd.DataFrame, y: pd.Series):
     y = y.astype("int")
 
     # Calculate number of unique classes and number of elements in each class
-    unique_classes: np.ndarray = y.unique()  # type: ignore
 
+    unique_classes: np.ndarray = y.unique()  # type: ignore
     # These are helper functions to calculate the metadata
     hyper_centres: np.ndarray = create_hypersphere(X.values, y.values)
     avg_distance_between_class: float = distance(hyper_centres, unique_classes)
@@ -77,7 +77,7 @@ def calculate_hypershpere_metadata(X: pd.DataFrame, y: pd.Series):
     }
 
 
-def calculate_metafeatures(file: Path) -> dict:
+def calculate_metafeatures(file: Path | str, dataset: pd.DataFrame | None = None) -> dict:
     """
     Calculate metafeatures for a given dataset file.
     This is used as input for the recommender system models.
@@ -91,8 +91,11 @@ def calculate_metafeatures(file: Path) -> dict:
         Exception: If an error occurs during the calculation.
     """
 
-    file_name = file.stem
-    dataset = pd.read_csv(file)
+    if dataset is None:
+        file_name = file.stem
+        dataset = pd.read_csv(file)
+    else:
+        file_name = file
 
     # Target variable is defined as the last column in the dataset
     y: pd.Series = pd.Series(dataset.iloc[:, -1].copy())

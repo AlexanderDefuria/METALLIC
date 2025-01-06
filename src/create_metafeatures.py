@@ -66,6 +66,19 @@ import builtins
 from hyperparameters import HYPERPARAMETERS
 import argparse
 from calculate_metafeatures import calculate_metafeatures
+import os
+import sys
+
+def print(*args, **kwargs):
+    # Convert all arguments to strings and join them
+    message = ' '.join(str(arg) for arg in args)
+    
+    # Use os.system to echo the message
+    # os.system(f'echo {message}')
+    
+    # Print to stdout using the original sys.stdout.write
+    sys.stdout.write(message + '\n')
+    sys.stdout.flush()
 
 
 def get_classifiers(choice: str | None = None) -> Dict[str, object]:
@@ -77,7 +90,7 @@ def get_classifiers(choice: str | None = None) -> Dict[str, object]:
         "svm": SVC(probability=True),
         "rf": RandomForestClassifier(),
         "ada": AdaBoostClassifier(),
-        "cat": CatBoostClassifier(verbose=0),
+        "cat": CatBoostClassifier(verbose=0, task_type='CPU', thread_count=1),
     }
     return classifiers if choice is None else {choice: classifiers[choice]}
 
@@ -150,6 +163,7 @@ def train_classifiers(
     X_test = scaler.transform(X_test)
     classes: int = np.concatenate((y_train, y_test)).max() + 1
 
+    
     if classifier_name == "xgb":
         if classes == 2:
             classifier = XGBClassifier(objective="binary:logistic")
@@ -179,7 +193,7 @@ def train_classifiers(
             X_train_resampled, y_train_resampled = resampler.fit_resample(X_train, y_train)  # type: ignore
             resampled = 0
         except (ValueError, RuntimeError) as e:
-            if DEBUG:
+            if False: #DEBUG:
                 print(f"Error resampling {classifier_name} with {resampler_name}")
                 print(e)
                 print(file_name)
@@ -191,6 +205,11 @@ def train_classifiers(
 
     # Train the classifier and predict the target variable
     selected_search_space = HYPERPARAMETERS[classifier_name]
+    
+    starting_class_label = np.concatenate((y_train, y_test, y_train_resampled)).min()
+    print(f"STARTING CLASS {starting_class_label}")
+
+    print(f"Training {file_name} - {classifier_name} - {resampler_name}")
     try:
         if "n_neighbors" in selected_search_space:
             min_samples = min(y_train.value_counts().min() - 1, 10)  # Bound n_neighbours <= n_samples in each fold
@@ -202,13 +221,12 @@ def train_classifiers(
             cv=StratifiedKFold(n_splits=internal_fold_count),
             refit=True,
             n_jobs=1,
-            n_iter=5,
-        ) if not quick else classifier
+        ) # if not quick else classifier
         model.fit(X_train_resampled, y_train_resampled)  # type: ignore
         y_pred = model.predict(X_test)
     except Exception as e:
-        if DEBUG:
-            print(f"Error training {classifier_name} with {resampler_name}")
+        print(f"Error training {classifier_name} with {resampler_name}")
+        if False: # DEBUG:
             print("Selected search space:")
             print(selected_search_space)
             print(e)
@@ -298,21 +316,16 @@ def train(args: tuple) -> pd.DataFrame:
     Returns:
         pd.DataFrame: A DataFrame containing the calculated metafeatures and training results.
     """
-    file = args[0]
-    file_name = file.stem
+    file_name = args[0]
     classifier_name = args[1]
     resampler_name = args[2]
     quick = args[3]
+    dataset = args[4]
 
     print(f"Started {file_name} - {classifier_name} - {resampler_name}")
-    try:
-        dataset = pd.read_csv(file)
-        time.sleep(1)
-        metafeatures = calculate_metafeatures(file)
-    except Exception as e:
-        raise ValueError(f"Could not read or calculate {file_name}")
-
+    
     # Target variable is defined as the last column in the dataset
+    metafeatures = calculate_metafeatures(file_name, dataset)
     y: pd.Series = pd.Series(dataset.iloc[:, -1].copy())
     X: pd.DataFrame = pd.DataFrame(dataset.iloc[:, :-1].copy().astype("int"))
 
@@ -359,48 +372,57 @@ def get_existing_solutions(file: Path) -> list[tuple]:
 
 
 if __name__ == "__main__":
+    os.environ['OMP_NUM_THREADS'] = '1'
+    start_time = time.time()
+    metallic_dir = Path(__file__).parent.parent.resolve()
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--debug", action="store_true")
     argparser.add_argument("--quick", action="store_true")
     argparser.add_argument("--cpu", default=1)
     argparser.add_argument("--slurmid", default=1)
     argparser.add_argument("--slurmcount", default=1)
-    argparser.add_argument("--datadir", default="/home/adefu020/projects/def-pbranco/adefu020/METALLIC/data")
-    argparser.add_argument("--homedir", default="/home/adefu020/projects/def-pbranco/adefu020/METALLIC")
+    argparser.add_argument("--tempdir", default=metallic_dir)
+    argparser.add_argument("--homedir", default=metallic_dir)
 
     DEBUG = argparser.parse_args().debug
     CPUS = int(argparser.parse_args().cpu)
     QUICK = argparser.parse_args().quick
     SLURMID = int(argparser.parse_args().slurmid)
     SLURMCOUNT = int(argparser.parse_args().slurmcount)
-    DATADIR = argparser.parse_args().datadir
     home_dir = Path(argparser.parse_args().homedir)
+    temp_dir = Path(argparser.parse_args().tempdir)
+    data_dir = temp_dir / "data"
+    out_dir = temp_dir
     assert CPUS >= 1
     print(f"SLURMID: {SLURMID} with {CPUS} CPUS")
 
     if SLURMCOUNT>1:
-        metafeature_file = home_dir / f"metafeatures_{SLURMID}.csv"
+        metafeature_file = out_dir / f"metafeatures_{SLURMID}.csv"
         existing_solutions = get_existing_solutions(home_dir / "merged_metafeatures.csv")
     else:
-        metafeature_file = home_dir / "metafeatures.csv"
+        metafeature_file = out_dir / "metafeatures.csv"
         existing_solutions = get_existing_solutions(metafeature_file)
 
-    data_dir: Path = Path(DATADIR)
-    datasets = get_datasets(data_dir)
-
-    datasets = sorted(datasets)
-    datasets = [dataset for dataset in datasets if "geobia" in dataset.stem.lower()]
+    datasets = sorted(get_datasets(data_dir))
+    #datasets = [dataset for dataset in datasets if "geobia" in dataset.stem.lower()]
     combinations = itertools.product(datasets, get_classifiers().keys(), get_resamplers().keys(), [QUICK])
     combinations = [c for c in combinations if (c[0].stem, c[1], c[2]) not in existing_solutions]
     combinations = combinations[SLURMID-1::SLURMCOUNT]
+    # combinations = combinations[:2]
+    for i, c in enumerate(combinations):
+        try:
+            combinations[i] =  (c[0], c[1], c[2], c[3], pd.read_csv(c[0]))
+        except Exception:
+            combinations[i] = None
+    combinations = [c for c in combinations if c is not None]
+            
+            
+    ncpus = int(os.environ.get('SLURM_CPUS_PER_TASK',default=1)) * 4
+    print(f"START COMPUTE for {len(combinations)} COMBINATIONS and {ncpus} CPUS")
 
-    # Calculate metafeatures and classifiers for each dataset
-    print(f"START COMPUTE for {len(combinations)} COMBINATIONS")
-
-    #with mp.Pool(processes = CPUS) as pool:
-    with ProcessPool() as pool:
-        #for result in pool.imap_unordered(train, combinations):
-        for result in pool.imap(train, combinations):
+    
+    with mp.get_context("spawn").Pool(processes=ncpus) as pool:
+        for result in pool.imap_unordered(train, combinations):
             if result is None:
                 print("Failed Result...")
                 continue
@@ -408,10 +430,8 @@ if __name__ == "__main__":
             if not metafeature_file.exists():
                 result.to_csv(metafeature_file, index=False)
             else:
-                print(result.to_csv(index=False, header=False))
                 f = open(metafeature_file, 'a')
                 f.write(result.to_csv(index=False, header=False))
                 f.close()
-       
 
     print("Done!")
